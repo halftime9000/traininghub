@@ -34,7 +34,7 @@
   .brand-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
   .brand-logo { flex-shrink: 0; }
   .subtitle { font-size: 13px; color: var(--text-secondary); margin: 0 0 16px; }
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
   .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px; text-align: center; cursor: pointer; font-family: inherit; width: 100%; }
   .stat-card.active { background: var(--green); border-color: var(--green); }
   .stat-card.active .label, .stat-card.active .value { color: white; }
@@ -46,6 +46,9 @@
   .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
   .platform-checks { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; padding: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
   .platform-checks label { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+  .reset-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .reset-row button { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); font-size: 12px; cursor: pointer; color: var(--text-secondary); }
+  .reset-row button.danger { color: var(--danger); border-color: var(--danger); }
   .tab { padding: 7px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 13px; font-weight: 500; cursor: pointer; }
   .tab.active { background: var(--green); color: white; border-color: var(--green); }
   .controls { display: flex; gap: 8px; margin-bottom: 12px; }
@@ -115,6 +118,7 @@
     <div class="search-box"><input type="text" id="searchInput" placeholder="Zoek op trefwoord, categorie of platform..."></div>
     <div class="tabs" id="tabs"></div>
     <div class="platform-checks" id="platformChecks" style="display:none;"></div>
+    <div class="reset-row" id="resetRow" style="display:none;"></div>
     <div class="controls">
       <select id="fPlatform"></select>
       <select id="fFav"></select>
@@ -122,7 +126,6 @@
     <div class="btn-row">
       <button class="inspire-btn" id="inspireBtn">💡 Geef me inspiratie</button>
       <button class="add-btn" id="openAddBtn">+ Link</button>
-      <button class="add-btn" id="resetUsedBtn" title="Reset alle 'gebruikt' markeringen">🔄</button>
     </div>
     <div class="spotlight" id="spotlight"></div>
     <div class="list" id="list"></div>
@@ -236,7 +239,9 @@ function tabsHtml(){
   const cats = ["OPWARMING","TV","WV","EINDSPEL","KEEPER","ANDERE"];
   return cats.map(function(c){
     const label = CAT_LABEL[c]||c;
-    const count = DATA.filter(function(d){return d.effC===c;}).length;
+    const count = DATA.filter(function(d){
+      return d.effC===c && (statFilter === "USED" ? d.u : !d.u);
+    }).length;
     const active = activeCat === c ? "active" : "";
     const style = active ? ' style="background:'+CAT_COLORS[c].bg+';color:'+CAT_COLORS[c].fg+';border-color:'+CAT_COLORS[c].fg+';"' : "";
     return '<button class="tab '+active+'" data-cat="'+c+'"'+style+'>'+label+' ('+count+')</button>';
@@ -248,13 +253,16 @@ const CATEGORY_ORDER = ["OPWARMING","TV","WV","EINDSPEL","KEEPER","ANDERE"];
 function renderStats(){
   const total = DATA.length;
   const fav = DATA.filter(function(d){return d.s==="Favoriet"||d.s==="Favori";}).length;
-  const tagged = DATA.filter(function(d){return d.effC;}).length;
-  const untagged = total - tagged;
+  const activeItems = DATA.filter(function(d){return !d.u;});
+  const tagged = activeItems.filter(function(d){return d.effC;}).length;
+  const untagged = activeItems.length - tagged;
+  const used = DATA.filter(function(d){return d.u;}).length;
   const cards = [
     ["Totaal",total,"ALL"],
     ["Favoriet",fav,"FAV"],
     ["Gecategoriseerd",tagged,"TAGGED"],
-    ["Nog te doen",untagged,"NONE"]
+    ["Nog te doen",untagged,"NONE"],
+    ["Gebruikt",used,"USED"]
   ];
   document.getElementById("stats").innerHTML = cards.map(function(c){
     const isActive = statFilter === c[2];
@@ -277,8 +285,10 @@ function bindTabs(){
   document.querySelectorAll('.tab').forEach(function(btn){
     btn.addEventListener('click', function(){
       activeCat = (activeCat === btn.getAttribute('data-cat')) ? "" : btn.getAttribute('data-cat');
-      statFilter = "ALL";
-      document.getElementById("fFav").value = "";
+      if(statFilter !== "USED"){
+        statFilter = "ALL";
+        document.getElementById("fFav").value = "";
+      }
       applyFilters();
       renderStats();
     });
@@ -302,9 +312,14 @@ function applyFilters(){
     checksEl.style.display = "none";
   }
   filtered = DATA.filter(function(d){
-    if(statFilter === "TAGGED" && !d.effC) return false;
-    if(statFilter === "NONE" && d.effC) return false;
-    if(statFilter === "NONE" && checkedPlatforms.length && checkedPlatforms.indexOf(d.p)===-1) return false;
+    if(statFilter === "USED"){
+      if(!d.u) return false;
+    } else {
+      if(d.u) return false;
+      if(statFilter === "TAGGED" && !d.effC) return false;
+      if(statFilter === "NONE" && d.effC) return false;
+      if(statFilter === "NONE" && checkedPlatforms.length && checkedPlatforms.indexOf(d.p)===-1) return false;
+    }
     if(activeCat && d.effC!==activeCat) return false;
     if(p && d.p!==p) return false;
     if(f && d.s!=="Favoriet" && d.s!=="Favori") return false;
@@ -322,7 +337,7 @@ function applyFilters(){
   } else {
     filtered.sort(function(a,b){ return parseDate(b.d) - parseDate(a.d); });
   }
-  filtered.sort(function(a,b){ return (a.u?1:0) - (b.u?1:0); });
+  renderResetRow();
   visibleCount = 20;
   document.getElementById("tabs").innerHTML = tabsHtml();
   bindTabs();
@@ -361,7 +376,6 @@ function bindStaticEvents(){
     renderSpotlight(finalPool[Math.floor(Math.random()*finalPool.length)]);
   });
   document.getElementById("openAddBtn").addEventListener("click", openAddModal);
-  document.getElementById("resetUsedBtn").addEventListener("click", resetAllUsed);
   document.getElementById("moreBtn").addEventListener("click", function(){ visibleCount += 30; renderList(); });
   document.getElementById("modalOverlay").addEventListener("click", function(e){ if(e.target.id === "modalOverlay") closeModal(); });
 }
@@ -522,6 +536,32 @@ async function resetAllUsed(){
   await loadData();
   renderStats();
   applyFilters();
+}
+
+async function resetCategoryUsed(cat){
+  const label = CAT_LABEL[cat] || cat;
+  if(!confirm("'Gebruikt' markering resetten voor alle "+label+" video's?")) return;
+  const { error } = await supabaseClient.from("training_links").update({ used: false }).eq("used", true).eq("category", cat);
+  if(error){ alert("Resetten mislukt: " + error.message); return; }
+  await loadData();
+  renderStats();
+  applyFilters();
+}
+
+function renderResetRow(){
+  const el = document.getElementById("resetRow");
+  if(statFilter !== "USED"){ el.style.display = "none"; el.innerHTML = ""; return; }
+  el.style.display = "flex";
+  let html = '<button type="button" class="danger" id="resetAllBtn">🔄 Reset alles</button>';
+  if(activeCat){
+    html += '<button type="button" id="resetCatBtn">🔄 Reset '+(CAT_LABEL[activeCat]||activeCat)+'</button>';
+  }
+  el.innerHTML = html;
+  document.getElementById("resetAllBtn").addEventListener("click", resetAllUsed);
+  const catBtn = document.getElementById("resetCatBtn");
+  if(catBtn){
+    catBtn.addEventListener("click", function(){ resetCategoryUsed(activeCat); });
+  }
 }
 </script>
 </body>
