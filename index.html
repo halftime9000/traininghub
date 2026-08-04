@@ -231,7 +231,7 @@ function refreshSelectors(){
 }
 
 function tabsHtml(){
-  const cats = ["OPWARMING","TV","WV","EINDSPEL","ANDERE"];
+  const cats = ["OPWARMING","TV","WV","EINDSPEL","KEEPER","ANDERE"];
   return cats.map(function(c){
     const label = CAT_LABEL[c]||c;
     const count = DATA.filter(function(d){return d.effC===c;}).length;
@@ -241,7 +241,7 @@ function tabsHtml(){
   }).join("");
 }
 
-const CATEGORY_ORDER = ["OPWARMING","TV","WV","EINDSPEL","ANDERE","KEEPER"];
+const CATEGORY_ORDER = ["OPWARMING","TV","WV","EINDSPEL","KEEPER","ANDERE"];
 
 function renderStats(){
   const total = DATA.length;
