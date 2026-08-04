@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HalfTime Training Hub</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --green: #2E5C3E; --green-light: #EAF2EC; --bg: #FAFAF8; --surface: #FFFFFF;
+    --border: #E5E5E0; --text: #1A1A1A; --text-secondary: #6B6B66; --accent: #C9902E; --danger: #C62828;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); margin: 0; padding: 16px;
+    max-width: 720px; margin-left: auto; margin-right: auto; padding-bottom: 48px;
+  }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+  .subtitle { font-size: 13px; color: var(--text-secondary); margin: 0 0 16px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px; text-align: center; }
+  .stat-card .label { font-size: 11px; color: var(--text-secondary); margin-bottom: 2px; }
+  .stat-card .value { font-size: 18px; font-weight: 600; }
+  .search-box { position: relative; margin-bottom: 12px; }
+  .search-box input { width: 100%; padding: 10px 12px 10px 36px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); font-size: 14px; }
+  .search-box::before { content: "🔍"; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 13px; opacity: 0.6; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .tab { padding: 7px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 13px; font-weight: 500; cursor: pointer; }
+  .tab.active { background: var(--green); color: white; border-color: var(--green); }
+  .controls { display: flex; gap: 8px; margin-bottom: 12px; }
+  select, input[type=text], input[type=url], textarea { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); font-size: 13px; flex: 1; font-family: inherit; }
+  .btn-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .inspire-btn { flex: 1; padding: 12px; border-radius: 10px; border: none; background: var(--green); color: white; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .add-btn { padding: 12px 16px; border-radius: 10px; border: 1px solid var(--green); background: white; color: var(--green); font-size: 15px; font-weight: 600; cursor: pointer; }
+  .spotlight { border-radius: 12px; padding: 16px; margin-bottom: 16px; display: none; flex-direction: column; gap: 6px; background: var(--green-light); }
+  .spotlight.show { display: flex; }
+  .spotlight .row { display: flex; align-items: center; gap: 8px; }
+  .spotlight .platform { font-weight: 600; font-size: 15px; }
+  .spotlight .badge { font-size: 11px; background: white; padding: 2px 8px; border-radius: 6px; font-weight: 600; }
+  .spotlight .star { margin-left: auto; color: var(--accent); font-size: 18px; }
+  .spotlight .note { font-size: 14px; }
+  .spotlight a.open { font-size: 14px; font-weight: 600; text-decoration: none; margin-top: 4px; }
+  .list { display: flex; flex-direction: column; }
+  .item { display: flex; align-items: center; gap: 8px; padding: 10px 4px; border-bottom: 1px solid var(--border); }
+  .item .link-part { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; text-decoration: none; color: var(--text); }
+  .item .cat { font-size: 11px; padding: 2px 6px; border-radius: 6px; flex-shrink: 0; min-width: 60px; text-align: center; }
+  .item .note { font-size: 13px; color: var(--text-secondary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .star { color: var(--accent); font-size: 13px; flex-shrink: 0; }
+  .item .actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .icon-btn { background: none; border: none; cursor: pointer; font-size: 14px; padding: 4px; opacity: 0.55; }
+  .icon-btn:hover { opacity: 1; }
+  .more-btn { width: 100%; padding: 10px; margin-top: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); font-size: 13px; cursor: pointer; }
+  .empty { text-align: center; color: var(--text-secondary); font-size: 14px; padding: 20px 0; }
+  footer { text-align: center; font-size: 11px; color: var(--text-secondary); margin-top: 24px; }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; padding: 16px; z-index: 100; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: white; border-radius: 14px; padding: 20px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 10px; max-height: 90vh; overflow-y: auto; }
+  .modal h3 { margin: 0 0 4px; font-size: 16px; }
+  .modal label { font-size: 12px; color: var(--text-secondary); font-weight: 600; margin-bottom: -4px; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .modal-actions button { flex: 1; padding: 10px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn-primary { background: var(--green); color: white; }
+  .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border) !important; }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .load-state { text-align: center; padding: 40px 0; color: var(--text-secondary); font-size: 14px; }
+  .config-warning { background: #FFF3E0; border: 1px solid #E65100; border-radius: 10px; padding: 14px; margin-bottom: 16px; font-size: 13px; line-height: 1.5; }
+  .config-warning code { background: white; padding: 1px 4px; border-radius: 4px; }
+</style>
+</head>
+<body>
+  <h1>⚽ HalfTime Training Hub</h1>
+  <p class="subtitle" id="subtitle"></p>
+  <div id="configWarning"></div>
+  <div id="appRoot" style="display:none;">
+    <div class="stats" id="stats"></div>
+    <div class="search-box"><input type="text" id="searchInput" placeholder="Zoek op trefwoord, categorie of platform..."></div>
+    <div class="tabs" id="tabs"></div>
+    <div class="controls">
+      <select id="fPlatform"></select>
+      <select id="fFav"></select>
+    </div>
+    <div class="btn-row">
+      <button class="inspire-btn" id="inspireBtn">💡 Geef me inspiratie</button>
+      <button class="add-btn" id="openAddBtn">+ Link</button>
+    </div>
+    <div class="spotlight" id="spotlight"></div>
+    <div class="list" id="list"></div>
+    <button class="more-btn" id="moreBtn" style="display:none;"></button>
+  </div>
+  <div id="loadState" class="load-state">Bezig met laden...</div>
+  <footer>Gegevens worden live opgeslagen in Supabase · HalfTime Training Hub</footer>
+
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="modalContent"></div>
+  </div>
+
+<script>
+// ============================================================
+// VUL HIER JE SUPABASE GEGEVENS IN (Project Settings > API)
+// ============================================================
+const SUPABASE_URL = "PLAATS_HIER_JE_SUPABASE_URL";
+const SUPABASE_ANON_KEY = "PLAATS_HIER_JE_SUPABASE_ANON_KEY";
+// ============================================================
+
+const CAT_LABEL = {OPWARMING:"Opwarming", WV:"Wedstrijdvorm", TV:"Tussenvorm", EINDSPEL:"Eindspel", KEEPER:"Keeper", ANDERE:"Andere"};
+const CAT_COLORS = {
+  OPWARMING: {bg:"#E8F5E9", fg:"#2E7D32"}, TV: {bg:"#FFF3E0", fg:"#E65100"}, WV: {bg:"#FFEBEE", fg:"#C62828"},
+  EINDSPEL: {bg:"#F3E5F5", fg:"#6A1B9A"}, KEEPER: {bg:"#E3F2FD", fg:"#1565C0"}, ANDERE: {bg:"#F5F5F5", fg:"#555555"}
+};
+const PLATFORMS = ["Instagram","TikTok","Facebook","YouTube","X/Twitter","Other"];
+
+let supabaseClient = null;
+let DATA = [];
+let activeCat = "";
+let searchTerm = "";
+let visibleCount = 20;
+let filtered = [];
+
+function isConfigured(){
+  return SUPABASE_URL.indexOf("PLAATS_HIER") === -1 && SUPABASE_ANON_KEY.indexOf("PLAATS_HIER") === -1;
+}
+
+if(!isConfigured()){
+  document.getElementById("configWarning").innerHTML =
+    '<div class="config-warning">⚠️ Nog niet verbonden met Supabase. Open dit bestand, vul <code>SUPABASE_URL</code> en <code>SUPABASE_ANON_KEY</code> in bovenaan het script (te vinden in je Supabase project onder Settings → API), en sla opnieuw op.</div>';
+  document.getElementById("loadState").style.display = "none";
+} else {
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  init();
+}
+
+async function init(){
+  await loadData();
+  document.getElementById("loadState").style.display = "none";
+  document.getElementById("appRoot").style.display = "block";
+  refreshSelectors();
+  bindStaticEvents();
+  bindTabs();
+  renderStats();
+  applyFilters();
+  renderSpotlight(filtered[0]);
+}
+
+async function loadData(){
+  let all = [];
+  let from = 0;
+  const pageSize = 1000;
+  while(true){
+    const { data, error } = await supabaseClient
+      .from("training_links")
+      .select("*")
+      .range(from, from + pageSize - 1)
+      .order("link_date", { ascending: false });
+    if(error){
+      document.getElementById("loadState").textContent = "Fout bij laden: " + error.message;
+      throw error;
+    }
+    all = all.concat(data);
+    if(data.length < pageSize) break;
+    from += pageSize;
+  }
+  DATA = all.map(function(r){
+    return { id: r.id, d: r.link_date, p: r.platform, l: r.link, c: r.category || "", s: r.status || "", n: r.note || "" };
+  });
+  DATA.forEach(function(d){ d.effC = (d.c && !d.n) ? "ANDERE" : d.c; });
+}
+
+function parseDate(d){ if(!d) return new Date(0); const p=d.split("-"); return new Date(+p[2], +p[1]-1, +p[0]); }
+function todayStr(){ const t=new Date(); return String(t.getDate()).padStart(2,"0")+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+t.getFullYear(); }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+
+function uniqueVals(key){ return Array.from(new Set(DATA.map(function(d){return d[key];}).filter(Boolean))).sort(); }
+function populateSelect(id, values, allLabel, labelMap){
+  const el = document.getElementById(id);
+  const prevVal = el.value;
+  el.innerHTML = "";
+  const optAll = document.createElement("option");
+  optAll.value=""; optAll.textContent=allLabel;
+  el.appendChild(optAll);
+  values.forEach(function(v){
+    const o = document.createElement("option");
+    o.value=v; o.textContent = labelMap ? (labelMap[v]||v) : v;
+    el.appendChild(o);
+  });
+  el.value = prevVal;
+}
+function refreshSelectors(){
+  populateSelect("fPlatform", uniqueVals("p"), "Alle platforms");
+  populateSelect("fFav", ["Favoriet"], "Alle statussen");
+}
+
+function tabsHtml(){
+  const cats = ["", "OPWARMING","WV","TV","EINDSPEL","KEEPER","ANDERE"];
+  return cats.map(function(c){
+    const label = c ? (CAT_LABEL[c]||c) : "Alles";
+    const count = c ? DATA.filter(function(d){return d.effC===c;}).length : DATA.length;
+    const active = activeCat === c ? "active" : "";
+    const style = (active && c) ? ' style="background:'+CAT_COLORS[c].bg+';color:'+CAT_COLORS[c].fg+';border-color:'+CAT_COLORS[c].fg+';"' : "";
+    return '<button class="tab '+active+'" data-cat="'+c+'"'+style+'>'+label+' ('+count+')</button>';
+  }).join("");
+}
+
+function renderStats(){
+  const total = DATA.length;
+  const fav = DATA.filter(function(d){return d.s==="Favoriet"||d.s==="Favori";}).length;
+  const tagged = DATA.filter(function(d){return d.effC;}).length;
+  const untagged = total - tagged;
+  const cards = [["Totaal",total],["Favoriet",fav],["Gecategoriseerd",tagged],["Nog te doen",untagged]];
+  document.getElementById("stats").innerHTML = cards.map(function(c){
+    return '<div class="stat-card"><div class="label">'+c[0]+'</div><div class="value">'+c[1]+'</div></div>';
+  }).join("");
+  document.getElementById("subtitle").textContent = tagged + " video's gecategoriseerd, " + untagged + " nog te doen.";
+}
+
+function bindTabs(){
+  document.querySelectorAll('.tab').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      activeCat = btn.getAttribute('data-cat');
+      applyFilters();
+    });
+  });
+}
+
+function matchesSearch(item, term){
+  if(!term) return true;
+  const hay = [item.n, item.p, item.effC ? (CAT_LABEL[item.effC]||item.effC) : "", item.l].join(" ").toLowerCase();
+  return hay.indexOf(term.toLowerCase()) !== -1;
+}
+
+function applyFilters(){
+  const p = document.getElementById("fPlatform").value;
+  const f = document.getElementById("fFav").value;
+  filtered = DATA.filter(function(d){
+    if(activeCat && d.effC!==activeCat) return false;
+    if(p && d.p!==p) return false;
+    if(f && d.s!=="Favoriet" && d.s!=="Favori") return false;
+    if(!matchesSearch(d, searchTerm)) return false;
+    return true;
+  });
+  filtered.sort(function(a,b){
+    const af = (a.s==="Favoriet"||a.s==="Favori") ? 0 : 1;
+    const bf = (b.s==="Favoriet"||b.s==="Favori") ? 0 : 1;
+    if(af !== bf) return af - bf;
+    return parseDate(b.d)-parseDate(a.d);
+  });
+  visibleCount = 20;
+  document.getElementById("tabs").innerHTML = tabsHtml();
+  bindTabs();
+  renderList();
+}
+
+function bindStaticEvents(){
+  document.getElementById("fPlatform").addEventListener("change", applyFilters);
+  document.getElementById("fFav").addEventListener("change", applyFilters);
+  document.getElementById("searchInput").addEventListener("input", function(e){ searchTerm = e.target.value; applyFilters(); });
+  document.getElementById("inspireBtn").addEventListener("click", function(){
+    const pool = filtered.length ? filtered : DATA;
+    if(!pool.length){ renderSpotlight(null); return; }
+    renderSpotlight(pool[Math.floor(Math.random()*pool.length)]);
+  });
+  document.getElementById("openAddBtn").addEventListener("click", openAddModal);
+  document.getElementById("moreBtn").addEventListener("click", function(){ visibleCount += 30; renderList(); });
+  document.getElementById("modalOverlay").addEventListener("click", function(e){ if(e.target.id === "modalOverlay") closeModal(); });
+}
+
+function renderSpotlight(item){
+  const el = document.getElementById("spotlight");
+  if(!item){
+    el.classList.add("show");
+    el.style.background = "var(--green-light)";
+    el.innerHTML = '<p class="empty">Geen video gevonden voor dit filter.</p>';
+    return;
+  }
+  el.classList.add("show");
+  const col = item.effC ? CAT_COLORS[item.effC] : null;
+  el.style.background = col ? col.bg : "var(--green-light)";
+  el.innerHTML =
+    '<div class="row"><span class="platform">'+item.p+'</span>'+
+    (item.effC ? '<span class="badge" style="color:'+col.fg+';">'+(CAT_LABEL[item.effC]||item.effC)+'</span>' : '')+
+    ((item.s==="Favoriet"||item.s==="Favori") ? '<span class="star">★</span>' : '')+
+    '</div>'+
+    (item.n ? '<div class="note">'+escapeHtml(item.n)+'</div>' : '')+
+    '<a class="open" href="'+item.l+'" target="_blank" rel="noopener" style="color:'+(col?col.fg:'var(--green)')+';">Video openen →</a>';
+}
+
+function renderList(){
+  const slice = filtered.slice(0, visibleCount);
+  const listEl = document.getElementById("list");
+  if(slice.length === 0){
+    listEl.innerHTML = '<p class="empty">Geen resultaten.</p>';
+  } else {
+    listEl.innerHTML = slice.map(function(item){
+      const col = item.effC ? CAT_COLORS[item.effC] : null;
+      const catBadge = item.effC
+        ? '<span class="cat" style="background:'+col.bg+';color:'+col.fg+';">'+(CAT_LABEL[item.effC]||item.effC)+'</span>'
+        : '<span class="cat" style="visibility:hidden;">-</span>';
+      return '<div class="item" data-id="'+item.id+'">'+
+        '<a class="link-part" href="'+item.l+'" target="_blank" rel="noopener">'+
+          catBadge+
+          '<span class="note">'+escapeHtml(item.n||"")+'</span>'+
+          ((item.s==="Favoriet"||item.s==="Favori") ? '<span class="star">★</span>' : '')+
+        '</a>'+
+        '<span class="actions">'+
+          '<button class="icon-btn edit-btn" title="Bewerken">✏️</button>'+
+          '<button class="icon-btn delete-btn" title="Verwijderen">🗑️</button>'+
+        '</span>'+
+      '</div>';
+    }).join("");
+    listEl.querySelectorAll('.edit-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){ openEditModal(btn.closest('.item').getAttribute('data-id')); });
+    });
+    listEl.querySelectorAll('.delete-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){ deleteLink(btn.closest('.item').getAttribute('data-id')); });
+    });
+  }
+  const moreBtn = document.getElementById("moreBtn");
+  const remaining = filtered.length - visibleCount;
+  if(remaining > 0){ moreBtn.style.display="block"; moreBtn.textContent = remaining + " meer tonen"; }
+  else { moreBtn.style.display = "none"; }
+}
+
+function openModal(html){ document.getElementById("modalContent").innerHTML = html; document.getElementById("modalOverlay").classList.add("show"); }
+function closeModal(){ document.getElementById("modalOverlay").classList.remove("show"); }
+function catOptionsHtml(selected){ return Object.keys(CAT_LABEL).map(function(k){ return '<option value="'+k+'"'+(k===selected?' selected':'')+'>'+CAT_LABEL[k]+'</option>'; }).join(""); }
+function platformOptionsHtml(selected){ return PLATFORMS.map(function(p){ return '<option value="'+p+'"'+(p===selected?' selected':'')+'>'+p+'</option>'; }).join(""); }
+
+function openAddModal(){
+  openModal(
+    '<h3>Nieuwe link toevoegen</h3>'+
+    '<label>Link (URL)</label>'+
+    '<input type="url" id="m_url" placeholder="https://...">'+
+    '<label>Platform</label>'+
+    '<select id="m_platform">'+platformOptionsHtml("Instagram")+'</select>'+
+    '<label>Categorie</label>'+
+    '<select id="m_cat"><option value="">— geen —</option>'+catOptionsHtml("")+'</select>'+
+    '<label>Notitie</label>'+
+    '<textarea id="m_note" rows="2" placeholder="Korte omschrijving..."></textarea>'+
+    '<div class="checkbox-row"><input type="checkbox" id="m_fav"><label style="margin:0;">Favoriet</label></div>'+
+    '<div class="modal-actions"><button class="btn-secondary" id="m_cancel">Annuleren</button><button class="btn-primary" id="m_save">Opslaan</button></div>'
+  );
+  document.getElementById("m_cancel").addEventListener("click", closeModal);
+  document.getElementById("m_save").addEventListener("click", async function(){
+    const url = document.getElementById("m_url").value.trim();
+    if(!url){ alert("Vul een link in."); return; }
+    const payload = {
+      link_date: todayStr(),
+      platform: document.getElementById("m_platform").value,
+      link: url,
+      category: document.getElementById("m_cat").value || null,
+      status: document.getElementById("m_fav").checked ? "Favoriet" : null,
+      note: document.getElementById("m_note").value.trim() || null
+    };
+    const { error } = await supabaseClient.from("training_links").insert(payload);
+    if(error){ alert("Opslaan mislukt: " + error.message); return; }
+    closeModal();
+    await loadData();
+    refreshSelectors();
+    renderStats();
+    applyFilters();
+  });
+}
+
+function openEditModal(id){
+  const item = DATA.find(function(d){ return String(d.id) === String(id); });
+  if(!item) return;
+  openModal(
+    '<h3>Link bewerken</h3>'+
+    '<label>Categorie</label>'+
+    '<select id="m_cat"><option value="">— geen —</option>'+catOptionsHtml(item.c)+'</select>'+
+    '<label>Notitie</label>'+
+    '<textarea id="m_note" rows="2">'+escapeHtml(item.n||"")+'</textarea>'+
+    '<div class="checkbox-row"><input type="checkbox" id="m_fav" '+((item.s==="Favoriet"||item.s==="Favori")?'checked':'')+'><label style="margin:0;">Favoriet</label></div>'+
+    '<div class="modal-actions"><button class="btn-secondary" id="m_cancel">Annuleren</button><button class="btn-primary" id="m_save">Opslaan</button></div>'
+  );
+  document.getElementById("m_cancel").addEventListener("click", closeModal);
+  document.getElementById("m_save").addEventListener("click", async function(){
+    const payload = {
+      category: document.getElementById("m_cat").value || null,
+      note: document.getElementById("m_note").value.trim() || null,
+      status: document.getElementById("m_fav").checked ? "Favoriet" : null
+    };
+    const { error } = await supabaseClient.from("training_links").update(payload).eq("id", id);
+    if(error){ alert("Opslaan mislukt: " + error.message); return; }
+    closeModal();
+    await loadData();
+    renderStats();
+    applyFilters();
+  });
+}
+
+async function deleteLink(id){
+  if(!confirm("Deze link verwijderen?")) return;
+  const { error } = await supabaseClient.from("training_links").delete().eq("id", id);
+  if(error){ alert("Verwijderen mislukt: " + error.message); return; }
+  await loadData();
+  renderStats();
+  applyFilters();
+}
+</script>
+</body>
+</html>
