@@ -224,12 +224,15 @@ function refreshSelectors(){
 }
 
 function tabsHtml(){
-  const cats = ["", "OPWARMING","WV","TV","EINDSPEL","KEEPER","ANDERE"];
+  const cats = ["", "NONE", "OPWARMING","WV","TV","EINDSPEL","KEEPER","ANDERE"];
   return cats.map(function(c){
-    const label = c ? (CAT_LABEL[c]||c) : "Alles";
-    const count = c ? DATA.filter(function(d){return d.effC===c;}).length : DATA.length;
+    const label = c === "NONE" ? "Nog te doen" : (c ? (CAT_LABEL[c]||c) : "Alles");
+    const count = c === "NONE"
+      ? DATA.filter(function(d){return !d.effC;}).length
+      : (c ? DATA.filter(function(d){return d.effC===c;}).length : DATA.length);
     const active = activeCat === c ? "active" : "";
-    const style = (active && c) ? ' style="background:'+CAT_COLORS[c].bg+';color:'+CAT_COLORS[c].fg+';border-color:'+CAT_COLORS[c].fg+';"' : "";
+    const colorInfo = c === "NONE" ? {bg:"#FFF3E0", fg:"#C9902E"} : (c ? CAT_COLORS[c] : null);
+    const style = (active && colorInfo) ? ' style="background:'+colorInfo.bg+';color:'+colorInfo.fg+';border-color:'+colorInfo.fg+';"' : "";
     return '<button class="tab '+active+'" data-cat="'+c+'"'+style+'>'+label+' ('+count+')</button>';
   }).join("");
 }
@@ -265,7 +268,8 @@ function applyFilters(){
   const p = document.getElementById("fPlatform").value;
   const f = document.getElementById("fFav").value;
   filtered = DATA.filter(function(d){
-    if(activeCat && d.effC!==activeCat) return false;
+    if(activeCat === "NONE"){ if(d.effC) return false; }
+    else if(activeCat && d.effC!==activeCat) return false;
     if(p && d.p!==p) return false;
     if(f && d.s!=="Favoriet" && d.s!=="Favori") return false;
     if(!matchesSearch(d, searchTerm)) return false;
