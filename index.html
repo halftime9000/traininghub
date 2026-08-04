@@ -35,7 +35,9 @@
   .brand-logo { flex-shrink: 0; }
   .subtitle { font-size: 13px; color: var(--text-secondary); margin: 0 0 16px; }
   .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
-  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px; text-align: center; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px; text-align: center; cursor: pointer; font-family: inherit; width: 100%; }
+  .stat-card.active { background: var(--green); border-color: var(--green); }
+  .stat-card.active .label, .stat-card.active .value { color: white; }
   .stat-card .label { font-size: 11px; color: var(--text-secondary); margin-bottom: 2px; }
   .stat-card .value { font-size: 18px; font-weight: 600; }
   .search-box { position: relative; margin-bottom: 12px; }
@@ -146,6 +148,7 @@ const PLATFORMS = ["Instagram","TikTok","Facebook","YouTube","X/Twitter","Other"
 let supabaseClient = null;
 let DATA = [];
 let activeCat = "";
+let statFilter = "ALL";
 let searchTerm = "";
 let visibleCount = 20;
 let filtered = [];
@@ -224,15 +227,12 @@ function refreshSelectors(){
 }
 
 function tabsHtml(){
-  const cats = ["", "NONE", "OPWARMING","WV","TV","EINDSPEL","KEEPER","ANDERE"];
+  const cats = ["OPWARMING","TV","WV","EINDSPEL","ANDERE"];
   return cats.map(function(c){
-    const label = c === "NONE" ? "Nog te doen" : (c ? (CAT_LABEL[c]||c) : "Alles");
-    const count = c === "NONE"
-      ? DATA.filter(function(d){return !d.effC;}).length
-      : (c ? DATA.filter(function(d){return d.effC===c;}).length : DATA.length);
+    const label = CAT_LABEL[c]||c;
+    const count = DATA.filter(function(d){return d.effC===c;}).length;
     const active = activeCat === c ? "active" : "";
-    const colorInfo = c === "NONE" ? {bg:"#FFF3E0", fg:"#C9902E"} : (c ? CAT_COLORS[c] : null);
-    const style = (active && colorInfo) ? ' style="background:'+colorInfo.bg+';color:'+colorInfo.fg+';border-color:'+colorInfo.fg+';"' : "";
+    const style = active ? ' style="background:'+CAT_COLORS[c].bg+';color:'+CAT_COLORS[c].fg+';border-color:'+CAT_COLORS[c].fg+';"' : "";
     return '<button class="tab '+active+'" data-cat="'+c+'"'+style+'>'+label+' ('+count+')</button>';
   }).join("");
 }
@@ -242,18 +242,41 @@ function renderStats(){
   const fav = DATA.filter(function(d){return d.s==="Favoriet"||d.s==="Favori";}).length;
   const tagged = DATA.filter(function(d){return d.effC;}).length;
   const untagged = total - tagged;
-  const cards = [["Totaal",total],["Favoriet",fav],["Gecategoriseerd",tagged],["Nog te doen",untagged]];
+  const cards = [
+    ["Totaal",total,"ALL"],
+    ["Favoriet",fav,"FAV"],
+    ["Gecategoriseerd",tagged,"TAGGED"],
+    ["Nog te doen",untagged,"NONE"]
+  ];
   document.getElementById("stats").innerHTML = cards.map(function(c){
-    return '<div class="stat-card"><div class="label">'+c[0]+'</div><div class="value">'+c[1]+'</div></div>';
+    const isActive = statFilter === c[2];
+    return '<button class="stat-card'+(isActive?' active':'')+'" data-stat="'+c[2]+'"><div class="label">'+c[0]+'</div><div class="value">'+c[1]+'</div></button>';
   }).join("");
   document.getElementById("subtitle").textContent = tagged + " video's gecategoriseerd, " + untagged + " nog te doen.";
+  document.querySelectorAll('.stat-card').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      const action = btn.getAttribute('data-stat');
+      statFilter = (statFilter === action) ? "ALL" : action;
+      if(statFilter === "FAV"){
+        document.getElementById("fFav").value = "Favoriet";
+      } else {
+        document.getElementById("fFav").value = "";
+      }
+      activeCat = "";
+      applyFilters();
+      renderStats();
+    });
+  });
 }
 
 function bindTabs(){
   document.querySelectorAll('.tab').forEach(function(btn){
     btn.addEventListener('click', function(){
-      activeCat = btn.getAttribute('data-cat');
+      activeCat = (activeCat === btn.getAttribute('data-cat')) ? "" : btn.getAttribute('data-cat');
+      statFilter = "ALL";
+      document.getElementById("fFav").value = "";
       applyFilters();
+      renderStats();
     });
   });
 }
@@ -268,8 +291,9 @@ function applyFilters(){
   const p = document.getElementById("fPlatform").value;
   const f = document.getElementById("fFav").value;
   filtered = DATA.filter(function(d){
-    if(activeCat === "NONE"){ if(d.effC) return false; }
-    else if(activeCat && d.effC!==activeCat) return false;
+    if(statFilter === "TAGGED" && !d.effC) return false;
+    if(statFilter === "NONE" && d.effC) return false;
+    if(activeCat && d.effC!==activeCat) return false;
     if(p && d.p!==p) return false;
     if(f && d.s!=="Favoriet" && d.s!=="Favori") return false;
     if(!matchesSearch(d, searchTerm)) return false;
