@@ -44,6 +44,8 @@
   .search-box input { width: 100%; padding: 10px 12px 10px 36px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); font-size: 14px; }
   .search-box::before { content: "🔍"; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 13px; opacity: 0.6; }
   .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .platform-checks { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; padding: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+  .platform-checks label { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
   .tab { padding: 7px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 13px; font-weight: 500; cursor: pointer; }
   .tab.active { background: var(--green); color: white; border-color: var(--green); }
   .controls { display: flex; gap: 8px; margin-bottom: 12px; }
@@ -111,6 +113,7 @@
     <div class="stats" id="stats"></div>
     <div class="search-box"><input type="text" id="searchInput" placeholder="Zoek op trefwoord, categorie of platform..."></div>
     <div class="tabs" id="tabs"></div>
+    <div class="platform-checks" id="platformChecks" style="display:none;"></div>
     <div class="controls">
       <select id="fPlatform"></select>
       <select id="fFav"></select>
@@ -150,6 +153,7 @@ let DATA = [];
 let activeCat = "";
 let statFilter = "ALL";
 let searchTerm = "";
+let checkedPlatforms = [];
 let visibleCount = 20;
 let filtered = [];
 
@@ -288,9 +292,17 @@ function matchesSearch(item, term){
 function applyFilters(){
   const p = document.getElementById("fPlatform").value;
   const f = document.getElementById("fFav").value;
+  const checksEl = document.getElementById("platformChecks");
+  if(statFilter === "NONE"){
+    checksEl.style.display = "flex";
+    renderPlatformChecks();
+  } else {
+    checksEl.style.display = "none";
+  }
   filtered = DATA.filter(function(d){
     if(statFilter === "TAGGED" && !d.effC) return false;
     if(statFilter === "NONE" && d.effC) return false;
+    if(statFilter === "NONE" && checkedPlatforms.length && checkedPlatforms.indexOf(d.p)===-1) return false;
     if(activeCat && d.effC!==activeCat) return false;
     if(p && d.p!==p) return false;
     if(f && d.s!=="Favoriet" && d.s!=="Favori") return false;
@@ -303,6 +315,8 @@ function applyFilters(){
       if(ai !== bi) return (ai===-1?999:ai) - (bi===-1?999:bi);
       return parseDate(b.d) - parseDate(a.d);
     });
+  } else if(statFilter === "NONE"){
+    filtered.sort(function(a,b){ return parseDate(a.d) - parseDate(b.d); });
   } else {
     filtered.sort(function(a,b){ return parseDate(b.d) - parseDate(a.d); });
   }
@@ -310,6 +324,26 @@ function applyFilters(){
   document.getElementById("tabs").innerHTML = tabsHtml();
   bindTabs();
   renderList();
+}
+
+function renderPlatformChecks(){
+  const checksEl = document.getElementById("platformChecks");
+  const quickPlatforms = ["Instagram","TikTok","Facebook"];
+  checksEl.innerHTML = quickPlatforms.map(function(pf){
+    const checked = checkedPlatforms.indexOf(pf) !== -1;
+    return '<label><input type="checkbox" data-platform="'+pf+'" '+(checked?'checked':'')+'>'+pf+'</label>';
+  }).join("");
+  checksEl.querySelectorAll('input[type=checkbox]').forEach(function(cb){
+    cb.addEventListener('change', function(){
+      const pf = cb.getAttribute('data-platform');
+      if(cb.checked){
+        if(checkedPlatforms.indexOf(pf)===-1) checkedPlatforms.push(pf);
+      } else {
+        checkedPlatforms = checkedPlatforms.filter(function(x){ return x!==pf; });
+      }
+      applyFilters();
+    });
+  });
 }
 
 function bindStaticEvents(){
