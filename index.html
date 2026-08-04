@@ -63,6 +63,7 @@
   .spotlight a.open { font-size: 14px; font-weight: 600; text-decoration: none; margin-top: 4px; }
   .list { display: flex; flex-direction: column; }
   .item { display: flex; align-items: center; gap: 8px; padding: 10px 4px; border-bottom: 1px solid var(--border); }
+  .item.used { opacity: 0.45; }
   .item .link-part { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; text-decoration: none; color: var(--text); }
   .item .cat { font-size: 11px; padding: 2px 6px; border-radius: 6px; flex-shrink: 0; min-width: 60px; text-align: center; }
   .item .note { font-size: 13px; color: var(--text-secondary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -121,6 +122,7 @@
     <div class="btn-row">
       <button class="inspire-btn" id="inspireBtn">💡 Geef me inspiratie</button>
       <button class="add-btn" id="openAddBtn">+ Link</button>
+      <button class="add-btn" id="resetUsedBtn" title="Reset alle 'gebruikt' markeringen">🔄</button>
     </div>
     <div class="spotlight" id="spotlight"></div>
     <div class="list" id="list"></div>
@@ -201,7 +203,7 @@ async function loadData(){
     from += pageSize;
   }
   DATA = all.map(function(r){
-    return { id: r.id, d: r.link_date, p: r.platform, l: r.link, c: r.category || "", s: r.status || "", n: r.note || "" };
+    return { id: r.id, d: r.link_date, p: r.platform, l: r.link, c: r.category || "", s: r.status || "", n: r.note || "", u: !!r.used };
   });
   DATA.forEach(function(d){ d.effC = d.c; });
 }
@@ -320,6 +322,7 @@ function applyFilters(){
   } else {
     filtered.sort(function(a,b){ return parseDate(b.d) - parseDate(a.d); });
   }
+  filtered.sort(function(a,b){ return (a.u?1:0) - (b.u?1:0); });
   visibleCount = 20;
   document.getElementById("tabs").innerHTML = tabsHtml();
   bindTabs();
@@ -351,11 +354,14 @@ function bindStaticEvents(){
   document.getElementById("fFav").addEventListener("change", applyFilters);
   document.getElementById("searchInput").addEventListener("input", function(e){ searchTerm = e.target.value; applyFilters(); });
   document.getElementById("inspireBtn").addEventListener("click", function(){
-    const pool = filtered.length ? filtered : DATA;
-    if(!pool.length){ renderSpotlight(null); return; }
-    renderSpotlight(pool[Math.floor(Math.random()*pool.length)]);
+    const base = filtered.length ? filtered : DATA;
+    const pool = base.filter(function(d){ return !d.u; });
+    const finalPool = pool.length ? pool : base;
+    if(!finalPool.length){ renderSpotlight(null); return; }
+    renderSpotlight(finalPool[Math.floor(Math.random()*finalPool.length)]);
   });
   document.getElementById("openAddBtn").addEventListener("click", openAddModal);
+  document.getElementById("resetUsedBtn").addEventListener("click", resetAllUsed);
   document.getElementById("moreBtn").addEventListener("click", function(){ visibleCount += 30; renderList(); });
   document.getElementById("modalOverlay").addEventListener("click", function(e){ if(e.target.id === "modalOverlay") closeModal(); });
 }
@@ -391,7 +397,7 @@ function renderList(){
       const catBadge = item.effC
         ? '<span class="cat" style="background:'+col.bg+';color:'+col.fg+';">'+(CAT_LABEL[item.effC]||item.effC)+'</span>'
         : '<span class="cat" style="visibility:hidden;">-</span>';
-      return '<div class="item" data-id="'+item.id+'">'+
+      return '<div class="item'+(item.u?' used':'')+'" data-id="'+item.id+'">'+
         '<span class="idx">'+(idx+1)+'.</span>'+
         '<a class="link-part" href="'+item.l+'" target="_blank" rel="noopener">'+
           catBadge+
@@ -399,11 +405,15 @@ function renderList(){
           ((item.s==="Favoriet"||item.s==="Favori") ? '<span class="star">★</span>' : '')+
         '</a>'+
         '<span class="actions">'+
+          '<button class="icon-btn used-btn" title="'+(item.u?"Markeer als niet gebruikt":"Markeer als gebruikt")+'">'+(item.u?"↺":"✅")+'</button>'+
           '<button class="icon-btn edit-btn" title="Bewerken">✏️</button>'+
           '<button class="icon-btn delete-btn" title="Verwijderen">🗑️</button>'+
         '</span>'+
       '</div>';
     }).join("");
+    listEl.querySelectorAll('.used-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){ toggleUsed(btn.closest('.item').getAttribute('data-id')); });
+    });
     listEl.querySelectorAll('.edit-btn').forEach(function(btn){
       btn.addEventListener('click', function(){ openEditModal(btn.closest('.item').getAttribute('data-id')); });
     });
@@ -490,6 +500,25 @@ async function deleteLink(id){
   if(!confirm("Deze link verwijderen?")) return;
   const { error } = await supabaseClient.from("training_links").delete().eq("id", id);
   if(error){ alert("Verwijderen mislukt: " + error.message); return; }
+  await loadData();
+  renderStats();
+  applyFilters();
+}
+
+async function toggleUsed(id){
+  const item = DATA.find(function(d){ return String(d.id) === String(id); });
+  if(!item) return;
+  const { error } = await supabaseClient.from("training_links").update({ used: !item.u }).eq("id", id);
+  if(error){ alert("Bijwerken mislukt: " + error.message); return; }
+  await loadData();
+  renderStats();
+  applyFilters();
+}
+
+async function resetAllUsed(){
+  if(!confirm("Alle 'gebruikt' markeringen resetten?")) return;
+  const { error } = await supabaseClient.from("training_links").update({ used: false }).eq("used", true);
+  if(error){ alert("Resetten mislukt: " + error.message); return; }
   await loadData();
   renderStats();
   applyFilters();
