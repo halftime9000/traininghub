@@ -237,6 +237,8 @@ function tabsHtml(){
   }).join("");
 }
 
+const CATEGORY_ORDER = ["OPWARMING","TV","WV","EINDSPEL","ANDERE","KEEPER"];
+
 function renderStats(){
   const total = DATA.length;
   const fav = DATA.filter(function(d){return d.s==="Favoriet"||d.s==="Favori";}).length;
@@ -250,19 +252,15 @@ function renderStats(){
   ];
   document.getElementById("stats").innerHTML = cards.map(function(c){
     const isActive = statFilter === c[2];
-    return '<button class="stat-card'+(isActive?' active':'')+'" data-stat="'+c[2]+'"><div class="label">'+c[0]+'</div><div class="value">'+c[1]+'</div></button>';
+    return '<button type="button" class="stat-card'+(isActive?' active':'')+'" data-stat="'+c[2]+'"><div class="label">'+c[0]+'</div><div class="value">'+c[1]+'</div></button>';
   }).join("");
   document.getElementById("subtitle").textContent = tagged + " video's gecategoriseerd, " + untagged + " nog te doen.";
   document.querySelectorAll('.stat-card').forEach(function(btn){
     btn.addEventListener('click', function(){
       const action = btn.getAttribute('data-stat');
       statFilter = (statFilter === action) ? "ALL" : action;
-      if(statFilter === "FAV"){
-        document.getElementById("fFav").value = "Favoriet";
-      } else {
-        document.getElementById("fFav").value = "";
-      }
       activeCat = "";
+      document.getElementById("fFav").value = (statFilter === "FAV") ? "Favoriet" : "";
       applyFilters();
       renderStats();
     });
@@ -299,12 +297,15 @@ function applyFilters(){
     if(!matchesSearch(d, searchTerm)) return false;
     return true;
   });
-  filtered.sort(function(a,b){
-    const af = (a.s==="Favoriet"||a.s==="Favori") ? 0 : 1;
-    const bf = (b.s==="Favoriet"||b.s==="Favori") ? 0 : 1;
-    if(af !== bf) return af - bf;
-    return parseDate(b.d)-parseDate(a.d);
-  });
+  if(statFilter === "TAGGED" && !activeCat){
+    filtered.sort(function(a,b){
+      const ai = CATEGORY_ORDER.indexOf(a.effC); const bi = CATEGORY_ORDER.indexOf(b.effC);
+      if(ai !== bi) return (ai===-1?999:ai) - (bi===-1?999:bi);
+      return parseDate(b.d) - parseDate(a.d);
+    });
+  } else {
+    filtered.sort(function(a,b){ return parseDate(b.d) - parseDate(a.d); });
+  }
   visibleCount = 20;
   document.getElementById("tabs").innerHTML = tabsHtml();
   bindTabs();
