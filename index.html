@@ -186,34 +186,28 @@ let activeCat = "";
 let statFilter = "ALL";
 let searchTerm = "";
 let checkedPlatforms = [];
-let todayList = [];
-try {
-  const raw = localStorage.getItem("halftime_today_training");
-  todayList = raw ? JSON.parse(raw) : [];
-} catch(e){ todayList = []; }
-function saveTodayList(){
-  try { localStorage.setItem("halftime_today_training", JSON.stringify(todayList)); } catch(e){}
-}
-function isInToday(id){ return todayList.some(function(x){ return String(x.id) === String(id); }); }
-function addToToday(item){
-  if(isInToday(item.id)) return;
-  todayList.push({ id: item.id, l: item.l, n: item.n, c: item.effC || item.c, p: item.p });
-  saveTodayList();
+function isInToday(id){ const item = DATA.find(function(d){ return String(d.id)===String(id); }); return item ? !!item.t : false; }
+async function addToToday(item){
+  const { error } = await supabaseClient.from("training_links").update({ in_today: true }).eq("id", item.id);
+  if(error){ alert("Bijwerken mislukt: " + error.message); return; }
+  await loadData();
   renderStats();
-  if(statFilter === "TODAY") applyFilters();
+  applyFilters();
 }
-function removeFromToday(id){
-  todayList = todayList.filter(function(x){ return String(x.id) !== String(id); });
-  saveTodayList();
+async function removeFromToday(id){
+  const { error } = await supabaseClient.from("training_links").update({ in_today: false }).eq("id", id);
+  if(error){ alert("Bijwerken mislukt: " + error.message); return; }
+  await loadData();
   renderStats();
-  if(statFilter === "TODAY") applyFilters();
+  applyFilters();
 }
-function resetToday(){
+async function resetToday(){
   if(!confirm("Training vandaag leegmaken?")) return;
-  todayList = [];
-  saveTodayList();
+  const { error } = await supabaseClient.from("training_links").update({ in_today: false }).eq("in_today", true);
+  if(error){ alert("Resetten mislukt: " + error.message); return; }
+  await loadData();
   renderStats();
-  if(statFilter === "TODAY") applyFilters();
+  applyFilters();
 }
 let visibleCount = 20;
 let filtered = [];
@@ -374,7 +368,7 @@ async function loadData(){
     from += pageSize;
   }
   DATA = all.map(function(r){
-    return { id: r.id, d: r.link_date, p: r.platform, l: r.link, c: r.category || "", s: r.status || "", n: r.note || "", u: !!r.used };
+    return { id: r.id, d: r.link_date, p: r.platform, l: r.link, c: r.category || "", s: r.status || "", n: r.note || "", u: !!r.used, t: !!r.in_today };
   });
   DATA.forEach(function(d){ d.effC = d.c; });
 }
@@ -408,7 +402,10 @@ function tabsHtml(){
   return cats.map(function(c){
     const label = CAT_LABEL[c]||c;
     const count = DATA.filter(function(d){
-      return d.effC===c && (statFilter === "USED" ? d.u : !d.u);
+      if(d.effC !== c) return false;
+      if(statFilter === "USED") return d.u;
+      if(statFilter === "TODAY") return d.t;
+      return !d.u;
     }).length;
     const active = activeCat === c ? "active" : "";
     const col = CAT_COLORS[c];
@@ -428,13 +425,14 @@ function renderStats(){
   const tagged = activeItems.filter(function(d){return d.effC;}).length;
   const untagged = activeItems.length - tagged;
   const used = DATA.filter(function(d){return d.u;}).length;
+  const todayCount = DATA.filter(function(d){return d.t;}).length;
   const cards = [
     ["Totaal",total,"ALL"],
     ["Favoriet",fav,"FAV"],
     ["Gecategoriseerd",tagged,"TAGGED"],
     ["Nog te doen",untagged,"NONE"],
     ["Gebruikt",used,"USED"],
-    ["Training vandaag",todayList.length,"TODAY"]
+    ["Training vandaag",todayCount,"TODAY"]
   ];
   document.getElementById("stats").innerHTML = cards.map(function(c){
     const isActive = statFilter === c[2];
@@ -457,7 +455,7 @@ function bindTabs(){
   document.querySelectorAll('.tab').forEach(function(btn){
     btn.addEventListener('click', function(){
       activeCat = (activeCat === btn.getAttribute('data-cat')) ? "" : btn.getAttribute('data-cat');
-      if(statFilter !== "USED"){
+      if(statFilter !== "USED" && statFilter !== "TODAY"){
         statFilter = "ALL";
         document.getElementById("fFav").value = "";
       }
@@ -482,16 +480,6 @@ function applyFilters(){
   inspireBtn.style.display = hideInspire ? "none" : "block";
   const spotlightEl = document.getElementById("spotlight");
   if(hideInspire){ spotlightEl.classList.remove("show"); spotlightEl.innerHTML = ""; }
-  if(statFilter === "TODAY"){
-    checksEl.style.display = "none";
-    filtered = todayList.map(function(x){ return Object.assign({}, x, {effC: x.c, d: "", s: ""}); });
-    if(searchTerm){ filtered = filtered.filter(function(d){ return matchesSearch(d, searchTerm); }); }
-    renderResetRow();
-    visibleCount = 20;
-    document.getElementById("tabs").innerHTML = "";
-    renderList();
-    return;
-  }
   if(statFilter === "NONE"){
     checksEl.style.display = "flex";
     renderPlatformChecks();
@@ -501,6 +489,8 @@ function applyFilters(){
   filtered = DATA.filter(function(d){
     if(statFilter === "USED"){
       if(!d.u) return false;
+    } else if(statFilter === "TODAY"){
+      if(!d.t) return false;
     } else {
       if(d.u) return false;
       if(statFilter === "TAGGED" && !d.effC) return false;
@@ -608,7 +598,6 @@ function renderSpotlight(item){
   if(spotBtn){
     spotBtn.addEventListener('click', function(){
       if(isInToday(item.id)){ removeFromToday(item.id); } else { addToToday(item); }
-      renderSpotlight(item);
     });
   }
 }
@@ -648,7 +637,6 @@ function renderList(){
         if(statFilter === "TODAY"){ removeFromToday(id); return; }
         const item = filtered.find(function(d){ return String(d.id)===String(id); }) || DATA.find(function(d){ return String(d.id)===String(id); });
         if(isInToday(id)){ removeFromToday(id); } else if(item){ addToToday(item); }
-        renderList();
       });
     });
     listEl.querySelectorAll('.used-btn').forEach(function(btn){
