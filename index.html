@@ -222,10 +222,6 @@ function isConfigured(){
   return SUPABASE_URL.indexOf("PLAATS_HIER") === -1 && SUPABASE_ANON_KEY.indexOf("PLAATS_HIER") === -1;
 }
 
-if(!isConfigured()){
-  document.getElementById("configWarning").innerHTML =
-    '<div class="config-warning">⚠️ Nog niet verbonden met Supabase. Open dit bestand, vul <code>SUPABASE_URL</code> en <code>SUPABASE_ANON_KEY</code> in bovenaan het script (te vinden in je Supabase project onder Settings → API), en sla opnieuw op.</div>';
-} else {
 const REMEMBER_KEY = "halftime_remember_me";
 const rememberStorage = {
   getItem: function(key){ return localStorage.getItem(key) || sessionStorage.getItem(key); },
@@ -237,9 +233,13 @@ const rememberStorage = {
   removeItem: function(key){ localStorage.removeItem(key); sessionStorage.removeItem(key); }
 };
 
-supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { storage: rememberStorage, persistSession: true, autoRefreshToken: true }
-});
+if(!isConfigured()){
+  document.getElementById("configWarning").innerHTML =
+    '<div class="config-warning">⚠️ Nog niet verbonden met Supabase. Open dit bestand, vul <code>SUPABASE_URL</code> en <code>SUPABASE_ANON_KEY</code> in bovenaan het script (te vinden in je Supabase project onder Settings → API), en sla opnieuw op.</div>';
+} else {
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { storage: rememberStorage, persistSession: true, autoRefreshToken: true }
+  });
   bootstrap();
 }
 
@@ -317,17 +317,29 @@ async function handleAuthSubmit(){
   const password = document.getElementById("authPassword").value;
   const remember = document.getElementById("authRemember").checked;
   const errEl = document.getElementById("authError");
+  const submitBtn = document.getElementById("authSubmitBtn");
   errEl.textContent = "";
+  errEl.style.color = "var(--danger)";
   localStorage.setItem(REMEMBER_KEY, remember ? "1" : "0");
   if(!email || !password){ errEl.textContent = "Vul e-mail en wachtwoord in."; return; }
-  if(authMode === "signup"){
-    const { error } = await supabaseClient.auth.signUp({ email: email, password: password });
-    if(error){ errEl.textContent = error.message; return; }
-    errEl.style.color = "var(--green)";
-    errEl.textContent = "Account aangemaakt! Check je e-mail om te bevestigen, log daarna in.";
-  } else {
-    const { error } = await supabaseClient.auth.signInWithPassword({ email: email, password: password });
-    if(error){ errEl.textContent = error.message; return; }
+  submitBtn.disabled = true;
+  const originalLabel = submitBtn.textContent;
+  submitBtn.textContent = "Bezig...";
+  try {
+    if(authMode === "signup"){
+      const { error } = await supabaseClient.auth.signUp({ email: email, password: password });
+      if(error){ errEl.textContent = error.message; return; }
+      errEl.style.color = "var(--green)";
+      errEl.textContent = "Account aangemaakt! Check je e-mail om te bevestigen, log daarna in.";
+    } else {
+      const { error } = await supabaseClient.auth.signInWithPassword({ email: email, password: password });
+      if(error){ errEl.textContent = error.message || "Inloggen mislukt. Controleer je gegevens."; return; }
+    }
+  } catch(ex){
+    errEl.textContent = "Er ging iets mis: " + (ex && ex.message ? ex.message : ex);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalLabel;
   }
 }
 
