@@ -1,568 +1,810 @@
 <!DOCTYPE html>
-<html lang="nl">
+<html lang="nl-BE">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HalfTime Training Hub</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<title>PlayerNation | Voetbalstatistieken &amp; highlights uit je wedstrijdbeelden</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:ital,wght@0,600;1,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --green: #2E5C3E; --green-light: #EAF2EC; --bg: #FAFAF8; --surface: #FFFFFF;
-    --border: #E5E5E0; --text: #1A1A1A; --text-secondary: #6B6B66; --accent: #C9902E; --danger: #C62828;
+  :root{
+    --pitch-dark:#0F2A1C;
+    --pitch:#1F4A30;
+    --pitch-line:#2E6B45;
+    --chalk:#F5F2E8;
+    --chalk-dim:#E7E2D1;
+    --ink:#12140F;
+    --ink-soft:#4B4F45;
+    --amber:#FFB627;
+    --amber-deep:#E39A0B;
+    --line:#D8D2BC;
+    --radius:14px;
   }
-  * { box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg); color: var(--text); margin: 0; padding: 16px;
-    max-width: 720px; margin-left: auto; margin-right: auto; padding-bottom: 48px;
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;overflow-x:hidden;width:100%;}
+  body{
+    background:var(--chalk);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+    width:100%;
+    position:relative;
   }
-  h1 {
-    font-family: 'Sora', -apple-system, sans-serif;
-    font-style: italic;
-    font-weight: 700;
-    font-size: 24px;
-    letter-spacing: -0.02em;
-    margin: 0 0 4px;
-    background: linear-gradient(100deg, var(--green) 0%, #4A8F63 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+  .display{font-family:'Barlow Condensed',sans-serif;font-weight:800;text-transform:uppercase;letter-spacing:0.01em;}
+  .mono{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;}
+  a{color:inherit;text-decoration:none;}
+  img,svg{display:block;max-width:100%;}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 28px;}
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:8px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;letter-spacing:0.14em;text-transform:uppercase;
+    color:var(--pitch);font-weight:700;
   }
-  .brand-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
-  .brand-logo { flex-shrink: 0; }
-  .subtitle { font-size: 13px; color: var(--text-secondary); margin: 0 0 16px; }
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
-  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px; text-align: center; cursor: pointer; font-family: inherit; width: 100%; }
-  .stat-card.active { background: var(--green); border-color: var(--green); }
-  .stat-card.active .label, .stat-card.active .value { color: white; }
-  .stat-card .label { font-size: 11px; color: var(--text-secondary); margin-bottom: 2px; }
-  .stat-card .value { font-size: 18px; font-weight: 600; }
-  .search-box { position: relative; margin-bottom: 12px; }
-  .search-box input { width: 100%; padding: 10px 12px 10px 36px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); font-size: 14px; }
-  .search-box::before { content: "🔍"; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 13px; opacity: 0.6; }
-  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
-  .platform-checks { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; padding: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
-  .platform-checks label { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
-  .reset-row { display: flex; gap: 8px; margin-bottom: 12px; }
-  .reset-row button { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); font-size: 12px; cursor: pointer; color: var(--text-secondary); }
-  .reset-row button.danger { color: var(--danger); border-color: var(--danger); }
-  .tab { padding: 7px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 13px; font-weight: 500; cursor: pointer; }
-  .tab.active { background: var(--green); color: white; border-color: var(--green); }
-  .controls { display: flex; gap: 8px; margin-bottom: 12px; }
-  select, input[type=text], input[type=url], textarea { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); font-size: 13px; flex: 1; font-family: inherit; }
-  .btn-row { display: flex; gap: 8px; margin-bottom: 12px; }
-  .inspire-btn { flex: 1; padding: 12px; border-radius: 10px; border: none; background: var(--green); color: white; font-size: 15px; font-weight: 600; cursor: pointer; }
-  .add-btn { padding: 12px 16px; border-radius: 10px; border: 1px solid var(--green); background: white; color: var(--green); font-size: 15px; font-weight: 600; cursor: pointer; }
-  .spotlight { border-radius: 12px; padding: 16px; margin-bottom: 16px; display: none; flex-direction: column; gap: 6px; background: var(--green-light); }
-  .spotlight.show { display: flex; }
-  .spotlight .row { display: flex; align-items: center; gap: 8px; }
-  .spotlight .platform { font-weight: 600; font-size: 15px; }
-  .spotlight .badge { font-size: 11px; background: white; padding: 2px 8px; border-radius: 6px; font-weight: 600; }
-  .spotlight .star { margin-left: auto; color: var(--accent); font-size: 18px; }
-  .spotlight .note { font-size: 14px; }
-  .spotlight a.open { font-size: 14px; font-weight: 600; text-decoration: none; margin-top: 4px; }
-  .list { display: flex; flex-direction: column; }
-  .item { display: flex; align-items: center; gap: 8px; padding: 10px 4px; border-bottom: 1px solid var(--border); }
-  .item.used { opacity: 0.45; }
-  .item .link-part { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; text-decoration: none; color: var(--text); }
-  .item .cat { font-size: 11px; padding: 2px 6px; border-radius: 6px; flex-shrink: 0; min-width: 60px; text-align: center; }
-  .item .note { font-size: 13px; color: var(--text-secondary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .item .star { color: var(--accent); font-size: 13px; flex-shrink: 0; }
-  .item .idx { font-size: 12px; color: var(--text-secondary); flex-shrink: 0; width: 22px; text-align: right; }
-  .item .actions { display: flex; gap: 4px; flex-shrink: 0; }
-  .icon-btn { background: none; border: none; cursor: pointer; font-size: 14px; padding: 4px; opacity: 0.55; }
-  .icon-btn:hover { opacity: 1; }
-  .more-btn { width: 100%; padding: 10px; margin-top: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); font-size: 13px; cursor: pointer; }
-  .empty { text-align: center; color: var(--text-secondary); font-size: 14px; padding: 20px 0; }
-  footer { text-align: center; font-size: 11px; color: var(--text-secondary); margin-top: 24px; }
-  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; padding: 16px; z-index: 100; }
-  .modal-overlay.show { display: flex; }
-  .modal { background: white; border-radius: 14px; padding: 20px; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 10px; max-height: 90vh; overflow-y: auto; }
-  .modal h3 { margin: 0 0 4px; font-size: 16px; }
-  .modal label { font-size: 12px; color: var(--text-secondary); font-weight: 600; margin-bottom: -4px; }
-  .modal-actions { display: flex; gap: 8px; margin-top: 8px; }
-  .modal-actions button { flex: 1; padding: 10px; border-radius: 8px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; }
-  .btn-primary { background: var(--green); color: white; }
-  .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border) !important; }
-  .checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-  .load-state { text-align: center; padding: 40px 0; color: var(--text-secondary); font-size: 14px; }
-  .config-warning { background: #FFF3E0; border: 1px solid #E65100; border-radius: 10px; padding: 14px; margin-bottom: 16px; font-size: 13px; line-height: 1.5; }
-  .config-warning code { background: white; padding: 1px 4px; border-radius: 4px; }
+  .eyebrow::before{content:'';width:8px;height:8px;background:var(--amber);border-radius:50%;flex:none;}
+
+  /* ---------- HEADER ---------- */
+  header{
+    position:sticky;top:0;z-index:50;
+    background:rgba(245,242,232,0.92);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);
+  }
+  .nav{display:flex;align-items:center;justify-content:space-between;height:76px;}
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand-mark{
+    height:36px;width:auto;border-radius:6px;display:block;
+  }
+  .brand-name{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;letter-spacing:0.01em;}
+  .brand-name span{color:var(--pitch);}
+  .nav ul{display:flex;gap:32px;list-style:none;}
+  .nav ul li a{
+    font-size:14.5px;font-weight:600;color:var(--ink-soft);
+    padding-bottom:4px;border-bottom:2px solid transparent;
+    transition:color .15s ease, border-color .15s ease;
+  }
+  .nav ul li a:hover{color:var(--pitch);border-color:var(--amber);}
+  .nav-cta{
+    display:inline-flex;align-items:center;gap:8px;
+    background:var(--pitch);color:var(--chalk);
+    font-size:14px;font-weight:700;
+    padding:10px 20px;border-radius:999px;
+    transition:background .15s ease;
+  }
+  .nav-cta:hover{background:var(--pitch-dark);}
+  .nav-toggle{display:none;background:none;border:none;cursor:pointer;padding:8px;}
+  .nav-toggle span{display:block;width:24px;height:2px;background:var(--ink);margin:5px 0;}
+  .nav-links{display:flex;align-items:center;gap:32px;}
+
+  /* ---------- HERO ---------- */
+  .hero{
+    background:
+      radial-gradient(1100px 460px at 82% -10%, rgba(31,74,48,0.10), transparent 60%),
+      var(--chalk);
+    padding:76px 0 0;
+    position:relative;
+  }
+  .hero-grid{
+    display:grid;grid-template-columns:1.05fr 0.95fr;gap:56px;align-items:center;
+    padding-bottom:64px;
+  }
+  .hero h1{
+    font-size:clamp(38px,5vw,64px);
+    line-height:0.98;
+    margin:18px 0 22px;
+    color:var(--ink);
+  }
+  .hero h1 em{font-style:normal;color:var(--pitch);}
+  .hero p.lead{
+    font-size:18px;color:var(--ink-soft);max-width:480px;margin-bottom:30px;
+  }
+  .badge-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:34px;}
+  .store-badge{
+    display:flex;align-items:center;gap:10px;
+    background:var(--ink);color:var(--chalk);
+    padding:11px 18px;border-radius:10px;font-size:13px;font-weight:600;
+    border:1px solid var(--ink);
+    transition:transform .15s ease;
+  }
+  .store-badge:hover{transform:translateY(-2px);}
+  .store-badge small{display:block;font-size:10px;font-weight:400;opacity:0.75;letter-spacing:0.04em;}
+  .store-badge svg{flex:none;}
+  .hero-stat{display:flex;align-items:center;gap:14px;}
+  .hero-stat .num{font-size:30px;font-weight:800;font-family:'Barlow Condensed',sans-serif;color:var(--pitch);}
+  .avatars{display:flex;}
+  .avatars span{
+    width:34px;height:34px;border-radius:50%;
+    border:2px solid var(--chalk);margin-left:-10px;
+    background:var(--pitch-line);
+    display:flex;align-items:center;justify-content:center;
+    color:var(--chalk);font-size:12px;font-weight:700;font-family:'Barlow Condensed',sans-serif;
+  }
+  .avatars span:first-child{margin-left:0;}
+
+  /* Broadcast graphic hero visual */
+  .broadcast{
+    position:relative;background:var(--pitch-dark);
+    border-radius:20px;overflow:hidden;
+    box-shadow:0 30px 60px -20px rgba(15,42,28,0.45);
+  }
+  .broadcast-bg{
+    position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;
+  }
+  .broadcast::before{
+    content:'';position:absolute;inset:0;z-index:1;
+    background:
+      linear-gradient(180deg, rgba(15,42,28,0.35) 0%, rgba(15,42,28,0.55) 50%, rgba(15,42,28,0.94) 100%),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0 1px, transparent 1px 64px),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.06) 0 1px, transparent 1px 64px);
+  }
+  .broadcast-topbar{
+    position:relative;z-index:2;display:flex;justify-content:space-between;align-items:center;
+    padding:16px 18px;background:rgba(0,0,0,0.25);
+  }
+  .live-dot{display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#fff;letter-spacing:0.1em;}
+  .live-dot i{width:7px;height:7px;background:#FF5A4E;border-radius:50%;animation:pulse 1.4s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+  .clock{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);}
+  .broadcast-body{
+    position:relative;z-index:2;min-height:380px;
+    display:flex;flex-direction:column;justify-content:flex-end;
+    padding:22px;gap:14px;
+  }
+  .stat-card{
+    background:rgba(245,242,232,0.97);
+    border-radius:12px;padding:14px 16px;
+    display:flex;justify-content:space-between;align-items:center;
+    box-shadow:0 10px 24px -8px rgba(0,0,0,0.35);
+  }
+  .stat-card .label{font-size:12px;color:var(--ink-soft);font-weight:600;}
+  .stat-card .value{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:26px;color:var(--pitch);}
+  .heat-pill{
+    align-self:flex-start;
+    background:var(--amber);color:var(--ink);
+    font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;
+    padding:6px 12px;border-radius:999px;
+  }
+
+  /* ---------- TICKER (signature) ---------- */
+  .ticker-band{
+    background:var(--ink);color:var(--chalk);
+    border-top:1px solid var(--pitch-line);border-bottom:1px solid var(--pitch-line);
+    overflow:hidden;white-space:nowrap;
+  }
+  .ticker-track{display:inline-flex;animation:scroll 32s linear infinite;padding:13px 0;}
+  .ticker-track span{
+    font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;
+    padding:0 28px;border-right:1px solid rgba(245,242,232,0.2);
+    display:inline-flex;align-items:center;gap:8px;
+  }
+  .ticker-track span b{color:var(--amber);font-weight:700;}
+  @keyframes scroll{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
+  @media (prefers-reduced-motion: reduce){
+    .ticker-track{animation:none;}
+    .live-dot i{animation:none;}
+  }
+
+  /* ---------- SECTIONS shared ---------- */
+  section{padding:96px 0;}
+  .section-head{max-width:600px;margin-bottom:52px;}
+  .section-head h2{font-size:clamp(30px,3.6vw,44px);margin-top:14px;line-height:1.04;}
+  .section-head p{color:var(--ink-soft);font-size:16.5px;margin-top:14px;}
+  .divider{border:none;border-top:1px solid var(--line);}
+
+  /* ---------- MATCH FLOW (signature timeline) ---------- */
+  .flow{background:var(--pitch-dark);color:var(--chalk);}
+  .flow .section-head{max-width:640px;}
+  .flow .section-head .eyebrow{color:var(--amber);}
+  .flow .section-head p{color:rgba(245,242,232,0.7);}
+  .flow-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid rgba(245,242,232,0.15);}
+  .flow-step{padding:34px 30px;border-right:1px solid rgba(245,242,232,0.15);position:relative;}
+  .flow-step:last-child{border-right:none;}
+  .flow-step .minute{
+    font-family:'JetBrains Mono',monospace;color:var(--amber);font-weight:700;font-size:15px;
+    display:inline-block;margin-bottom:16px;
+  }
+  .flow-step h3{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:23px;margin-bottom:10px;text-transform:uppercase;}
+  .flow-step p{color:rgba(245,242,232,0.68);font-size:15px;}
+
+  /* ---------- FEATURE ROWS ---------- */
+  .feature-row{
+    display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;
+    padding:56px 0;border-bottom:1px solid var(--line);
+  }
+  .feature-row:last-of-type{border-bottom:none;}
+  .feature-row.reverse .feature-visual{order:2;}
+  .feature-tag{
+    font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--pitch);font-weight:700;
+    letter-spacing:0.08em;text-transform:uppercase;
+  }
+  .feature-row h3{font-size:clamp(24px,2.6vw,32px);margin:12px 0 12px;line-height:1.08;}
+  .feature-row p{color:var(--ink-soft);font-size:16px;max-width:440px;}
+  .feature-visual{
+    background:var(--chalk-dim);border-radius:var(--radius);
+    aspect-ratio:16/11;
+    display:flex;align-items:center;justify-content:center;
+    position:relative;overflow:hidden;border:1px solid var(--line);
+  }
+  .feature-visual img{
+    position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  }
+  .feature-visual::after{
+    content:'';position:absolute;inset:0;
+    background:linear-gradient(180deg, rgba(15,42,28,0) 40%, rgba(15,42,28,0.55) 100%);
+  }
+  .feature-visual .icon-badge{
+    position:absolute;left:18px;bottom:18px;z-index:2;
+    width:56px;height:56px;border-radius:50%;background:var(--pitch);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 10px 24px -8px rgba(0,0,0,0.5);
+  }
+  .feature-visual .icon-badge svg{width:26px;height:26px;stroke:var(--amber);}
+
+  /* ---------- WHY GRID ---------- */
+  .why{background:var(--chalk-dim);}
+  .why-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;}
+  .why-card{
+    background:var(--chalk);border:1px solid var(--line);border-radius:var(--radius);
+    padding:32px 28px;
+  }
+  .why-card .icon-badge{
+    width:52px;height:52px;border-radius:12px;background:var(--pitch-dark);
+    display:flex;align-items:center;justify-content:center;margin-bottom:20px;
+  }
+  .why-card .icon-badge svg{width:24px;height:24px;stroke:var(--amber);}
+  .why-card h3{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:21px;text-transform:uppercase;margin-bottom:8px;}
+  .why-card p{color:var(--ink-soft);font-size:15px;}
+
+  /* ---------- PERSONAS ---------- */
+  .persona-grid{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:1px;
+    background:var(--line);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;
+  }
+  .persona-cell{background:var(--chalk);padding:28px 22px;}
+  .persona-cell .role{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:20px;color:var(--pitch);text-transform:uppercase;}
+  .persona-cell .tag{font-size:13.5px;color:var(--ink-soft);margin-top:4px;}
+
+  /* ---------- TESTIMONIALS ---------- */
+  .testi-scroll{
+    display:flex;gap:20px;overflow-x:auto;padding-bottom:8px;scroll-snap-type:x mandatory;
+  }
+  .testi-scroll::-webkit-scrollbar{height:6px;}
+  .testi-scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;}
+  .testi-card{
+    scroll-snap-align:start;flex:0 0 340px;
+    background:var(--chalk);border:1px solid var(--line);border-radius:var(--radius);
+    padding:26px;display:flex;flex-direction:column;gap:16px;
+  }
+  .testi-quote{font-size:15px;color:var(--ink);line-height:1.55;}
+  .testi-who{display:flex;align-items:center;gap:12px;margin-top:auto;}
+  .testi-avatar{
+    width:38px;height:38px;border-radius:50%;background:var(--pitch);color:var(--chalk);
+    display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;
+  }
+  .testi-who .name{font-weight:700;font-size:14px;}
+  .testi-who .role{font-size:12.5px;color:var(--ink-soft);}
+  .testi-note{font-size:12.5px;color:var(--ink-soft);margin-top:10px;font-style:italic;}
+
+  /* ---------- FAQ ---------- */
+  .faq-item{border-bottom:1px solid var(--line);}
+  .faq-item summary{
+    list-style:none;cursor:pointer;
+    display:flex;justify-content:space-between;align-items:center;
+    padding:22px 0;font-weight:600;font-size:17px;
+  }
+  .faq-item summary::-webkit-details-marker{display:none;}
+  .faq-item summary .plus{
+    width:26px;height:26px;border-radius:50%;border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;flex:none;font-size:16px;color:var(--pitch);
+    transition:transform .2s ease;
+  }
+  .faq-item[open] summary .plus{transform:rotate(45deg);background:var(--pitch);color:var(--chalk);border-color:var(--pitch);}
+  .faq-item p{color:var(--ink-soft);padding-bottom:22px;font-size:15px;max-width:680px;}
+
+  /* ---------- FINAL CTA ---------- */
+  .final-cta{
+    background:var(--pitch-dark);color:var(--chalk);
+    border-radius:24px;padding:64px 48px;text-align:center;margin:0 28px;
+    position:relative;overflow:hidden;
+  }
+  .final-cta::before{
+    content:'';position:absolute;inset:0;
+    background:radial-gradient(600px 300px at 50% 0%, rgba(255,182,39,0.14), transparent 70%);
+  }
+  .final-cta > *{position:relative;z-index:1;}
+  .final-cta h2{font-size:clamp(30px,4vw,46px);margin:14px 0 12px;}
+  .final-cta p{color:rgba(245,242,232,0.72);margin-bottom:30px;}
+  .final-cta .badge-row{justify-content:center;}
+
+  /* ---------- FOOTER ---------- */
+  footer{background:var(--ink);color:rgba(245,242,232,0.75);padding:64px 0 28px;margin-top:96px;}
+  .footer-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:40px;margin-bottom:48px;}
+  footer h4{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;color:var(--amber);margin-bottom:16px;}
+  footer ul{list-style:none;}
+  footer ul li{margin-bottom:10px;font-size:14px;}
+  footer ul li a:hover{color:var(--chalk);}
+  .footer-brand .brand-name{color:var(--chalk);}
+  .footer-brand .brand-name span{color:var(--amber);}
+  .footer-brand p{margin-top:14px;font-size:14px;max-width:260px;color:rgba(245,242,232,0.55);}
+  .footer-bottom{
+    border-top:1px solid rgba(245,242,232,0.12);padding-top:24px;
+    display:flex;justify-content:space-between;align-items:center;font-size:13px;flex-wrap:wrap;gap:12px;
+  }
+  .social-row{display:flex;gap:14px;}
+  .social-row a{width:34px;height:34px;border-radius:50%;border:1px solid rgba(245,242,232,0.2);display:flex;align-items:center;justify-content:center;}
+  .social-row a:hover{border-color:var(--amber);}
+
+  /* ---------- RESPONSIVE ---------- */
+  @media (max-width:920px){
+    .nav-backdrop{display:none;position:fixed;inset:0;z-index:55;background:transparent;}
+    .nav-backdrop.open{display:block;}
+    .nav-links{
+      position:fixed;top:88px;right:20px;
+      width:min(260px,calc(100vw - 40px));
+      background:var(--pitch-dark);
+      border-radius:16px;
+      display:flex;flex-direction:column;
+      padding:10px;gap:0;
+      transform-origin:top right;
+      transform:scale(0.94) translateY(-6px);
+      opacity:0;pointer-events:none;
+      transition:opacity .16s ease, transform .16s ease;
+      z-index:60;
+      box-shadow:0 24px 48px -14px rgba(0,0,0,0.4);
+    }
+    .nav-links.open{opacity:1;transform:scale(1) translateY(0);pointer-events:auto;}
+    .nav-close{display:none;}
+    .nav-links ul{width:100%;}
+    .nav ul{flex-direction:column;gap:0;}
+    .nav ul li{width:100%;border-bottom:1px solid rgba(245,242,232,0.1);}
+    .nav ul li:last-child{border-bottom:none;}
+    .nav ul li a{
+      display:block;width:100%;padding:13px 12px;
+      font-size:15px;font-weight:600;color:var(--chalk)!important;
+      border-bottom:none;
+    }
+    .nav ul li a:hover{color:var(--amber)!important;}
+    .nav-toggle{display:block;}
+    .hero-grid{grid-template-columns:1fr;gap:40px;}
+    .broadcast{max-width:440px;}
+    .flow-grid{grid-template-columns:1fr;}
+    .flow-step{border-right:none;border-bottom:1px solid rgba(245,242,232,0.15);}
+    .feature-row{grid-template-columns:1fr;gap:28px;}
+    .feature-row.reverse .feature-visual{order:0;}
+    .why-grid{grid-template-columns:1fr;}
+    .persona-grid{grid-template-columns:repeat(2,1fr);}
+    .footer-grid{grid-template-columns:1fr 1fr;}
+    .final-cta{margin:0 16px;padding:48px 24px;}
+  }
+  @media (max-width:560px){
+    .wrap{padding:0 20px;}
+    section{padding:68px 0;}
+    .persona-grid{grid-template-columns:1fr;}
+    .footer-grid{grid-template-columns:1fr;}
+    .brand-name small{display:none;}
+    .nav-cta{font-size:12px;padding:8px 14px;white-space:nowrap;}
+  }
+
+  :focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
 </style>
 </head>
 <body>
-  <div class="brand-row">
-    <svg class="brand-logo" width="42" height="42" viewBox="0 0 42 42" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#2E5C3E"/>
-          <stop offset="100%" stop-color="#4A8F63"/>
-        </linearGradient>
-      </defs>
-      <rect width="42" height="42" rx="12" fill="url(#logoGrad)"/>
-      <circle cx="21" cy="21" r="12" fill="#FAFAF8"/>
-      <path d="M21 12.5 L26 16.2 L24.2 22 L17.8 22 L16 16.2 Z" fill="#2E5C3E"/>
-      <path d="M21 9.5 L21 12.5 M12.5 17.2 L16 16.2 M14.7 27 L17.8 22 M27.3 27 L24.2 22 M29.5 17.2 L26 16.2"
-            stroke="#2E5C3E" stroke-width="1.4" stroke-linecap="round" fill="none"/>
-      <path d="M8 30 Q21 24 34 30" stroke="#C9902E" stroke-width="2" stroke-linecap="round" fill="none"/>
-    </svg>
-    <h1>HalfTime Training Hub</h1>
-  </div>
-  <p class="subtitle" id="subtitle"></p>
-  <div id="configWarning"></div>
-  <div id="appRoot" style="display:none;">
-    <div class="stats" id="stats"></div>
-    <div class="search-box"><input type="text" id="searchInput" placeholder="Zoek op trefwoord, categorie of platform..."></div>
-    <div class="tabs" id="tabs"></div>
-    <div class="platform-checks" id="platformChecks" style="display:none;"></div>
-    <div class="reset-row" id="resetRow" style="display:none;"></div>
-    <div class="controls">
-      <select id="fPlatform"></select>
-      <select id="fFav"></select>
-    </div>
-    <div class="btn-row">
-      <button class="inspire-btn" id="inspireBtn">💡 Geef me inspiratie</button>
-      <button class="add-btn" id="openAddBtn">+ Link</button>
-    </div>
-    <div class="spotlight" id="spotlight"></div>
-    <div class="list" id="list"></div>
-    <button class="more-btn" id="moreBtn" style="display:none;"></button>
-  </div>
-  <div id="loadState" class="load-state">Bezig met laden...</div>
-  <footer>Gegevens worden live opgeslagen in Supabase · HalfTime Training Hub</footer>
 
-  <div class="modal-overlay" id="modalOverlay">
-    <div class="modal" id="modalContent"></div>
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="#top">
+      <img class="brand-mark" src="data:image/png;base64,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" alt="PlayerNation logo">
+      <small style="font-size:11px;font-weight:600;color:var(--ink-soft);">BE</small>
+    </a>
+    <div class="nav-backdrop" id="navBackdrop"></div>
+    <div class="nav-links" id="navLinks">
+      <button class="nav-close" id="navClose" aria-label="Sluit menu">✕</button>
+      <ul>
+        <li><a href="#functies">Functies</a></li>
+        <li><a href="#werkt">Hoe werkt het</a></li>
+        <li><a href="#faq">FAQ</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <a class="nav-cta" href="#contact">Demo aanvragen</a>
+      <button class="nav-toggle" id="navToggle" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
   </div>
+</header>
+
+<main id="top">
+
+  <!-- HERO -->
+  <section class="hero" style="padding-top:0;">
+    <div class="wrap">
+      <div class="hero-grid">
+        <div>
+          <span class="eyebrow">Officiële partner in België</span>
+          <h1 class="display">Van wedstrijdbeelden naar <em>statistieken</em>, highlights &amp; herinneringen.</h1>
+          <p class="lead">Upload de volledige wedstrijdbeelden en krijg statistieken, ratings, inzichten en highlights op profniveau. Gemaakt voor elke speler, coach en ouder — niet alleen voor prof's.</p>
+          <div class="badge-row">
+            <a class="store-badge" href="#">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M17.5 2h-11A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5v-15A2.5 2.5 0 0 0 17.5 2Z"/><path d="M11 18h2"/></svg>
+              <span><small>Download op</small>App Store</span>
+            </a>
+            <a class="store-badge" href="#">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3l14 9-14 9V3Z"/></svg>
+              <span><small>Beschikbaar op</small>Google Play</span>
+            </a>
+          </div>
+          <div class="hero-stat">
+            <div class="avatars">
+              <span>JV</span><span>ML</span><span>SD</span><span>TK</span>
+            </div>
+            <div>
+              <div class="num mono">37.247+</div>
+              <div style="font-size:13px;color:var(--ink-soft);">spelersprestaties geanalyseerd</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="broadcast">
+          <img class="broadcast-bg" src="https://images.unsplash.com/photo-1551280857-2b9bbe52acf4?fm=jpg&q=80&w=1200&auto=format&fit=crop" alt="Speler in actie tijdens de wedstrijd" loading="lazy">
+          <div class="broadcast-topbar">
+            <div class="live-dot"><i></i>LIVE ANALYSE</div>
+            <div class="clock">67:12</div>
+          </div>
+          <div class="broadcast-body">
+            <span class="heat-pill">✓ Doelpunt gedetecteerd — clip klaar</span>
+            <div class="stat-card">
+              <span class="label">Passnauwkeurigheid</span>
+              <span class="value mono">87%</span>
+            </div>
+            <div class="stat-card">
+              <span class="label">Tackles gewonnen</span>
+              <span class="value mono">9</span>
+            </div>
+            <div class="stat-card">
+              <span class="label">Balcontrole</span>
+              <span class="value mono">94%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TICKER -->
+  <div class="ticker-band">
+    <div class="ticker-track">
+      <span><b>87%</b> passnauwkeurigheid</span>
+      <span><b>100+</b> statistieken per wedstrijd</span>
+      <span><b>24u</b> verwerkingstijd</span>
+      <span><b>9</b> tackles gedetecteerd</span>
+      <span><b>4</b> blocks geregistreerd</span>
+      <span><b>37.247+</b> analyses tot nu toe</span>
+      <span><b>0€</b> voor je eerste analyse</span>
+      <span><b>87%</b> passnauwkeurigheid</span>
+      <span><b>100+</b> statistieken per wedstrijd</span>
+      <span><b>24u</b> verwerkingstijd</span>
+      <span><b>9</b> tackles gedetecteerd</span>
+      <span><b>4</b> blocks geregistreerd</span>
+      <span><b>37.247+</b> analyses tot nu toe</span>
+      <span><b>0€</b> voor je eerste analyse</span>
+    </div>
+  </div>
+
+  <!-- MATCH FLOW -->
+  <section class="flow" id="werkt">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Zo werkt het</span>
+        <h2 class="display">Negentig minuten, drie stappen.</h2>
+        <p>Van opname tot deelbare highlight — je hoeft zelf niets te taggen of te monteren.</p>
+      </div>
+    </div>
+    <div class="wrap" style="padding:0;">
+      <div class="flow-grid">
+        <div class="flow-step">
+          <span class="minute mono">1'</span>
+          <h3 class="display">Upload je wedstrijd</h3>
+          <p>Eender welke camera volstaat: een gsm, een AI-camera of gewoon een statief langs de lijn.</p>
+        </div>
+        <div class="flow-step">
+          <span class="minute mono">45'</span>
+          <h3 class="display">Automatische analyse</h3>
+          <p>Onze technologie verwerkt elke actie binnen 24 uur. Geen tagging, geen leercurve.</p>
+        </div>
+        <div class="flow-step">
+          <span class="minute mono">90'</span>
+          <h3 class="display">Ontvang je resultaten</h3>
+          <p>Statistieken, ratings en deelbare highlights, klaar om te bekijken en te delen.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="functies">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Functies</span>
+        <h2 class="display">Jouw sportreis, alles op één plek.</h2>
+      </div>
+
+      <div class="feature-row">
+        <div>
+          <span class="feature-tag">Statistieken</span>
+          <h3 class="display">Zie je wedstrijd zoals de profs ze zien.</h3>
+          <p>Elke actie automatisch bijgehouden. Verken 100+ statistieken, pass- en shotmaps — zo zie je niet alleen de uitslag, maar precies hoe die tot stand kwam.</p>
+        </div>
+        <div class="feature-visual">
+          <img src="https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?fm=jpg&q=80&w=1200&auto=format&fit=crop" alt="Spelers tijdens een wedstrijd" loading="lazy">
+          <div class="icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M4 19V9M12 19V5M20 19v-7"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-row reverse">
+        <div>
+          <span class="feature-tag">Highlights</span>
+          <h3 class="display">Elk groot moment, klaar om te delen.</h3>
+          <p>We scannen de volledige wedstrijd en maken automatisch deelbare clips van goals, assists en topmomenten — je highlights zijn meteen klaar om te herbeleven.</p>
+        </div>
+        <div class="feature-visual">
+          <img src="https://images.unsplash.com/photo-1517927033932-b3d18e61fb3a?fm=jpg&q=80&w=1200&auto=format&fit=crop" alt="Speler in actie tijdens het schot" loading="lazy">
+          <div class="icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M5 3l14 9-14 9V3Z"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-row">
+        <div>
+          <span class="feature-tag">Ratings</span>
+          <h3 class="display">Een rating na elke wedstrijd.</h3>
+          <p>Elke wedstrijd werkt je FIFA-stijl ratingkaart bij. Wedstrijd na wedstrijd bouw je een levend overzicht op van je prestaties, vooruitgang en mijlpalen.</p>
+        </div>
+        <div class="feature-visual">
+          <img src="https://images.unsplash.com/photo-1606925797300-0b35e9d1794e?fm=jpg&q=80&w=1200&auto=format&fit=crop" alt="Speler schiet op doel" loading="lazy">
+          <div class="icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.7 7-6.3-3.9-6.3 3.9 1.7-7L2 9.2l7.1-.6z"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-row reverse">
+        <div>
+          <span class="feature-tag">Ontwikkeling</span>
+          <h3 class="display">Weet precies waar je aan moet werken.</h3>
+          <p>Zie wat werkt, wat beter kan en wat de volgende stap is. Volg je vooruitgang van wedstrijd tot wedstrijd.</p>
+        </div>
+        <div class="feature-visual">
+          <img src="https://images.unsplash.com/photo-1560272564-c83b66b1ad12?fm=jpg&q=80&w=1200&auto=format&fit=crop" alt="Speler tijdens training" loading="lazy">
+          <div class="icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M3 3v18h18M7 14l4-4 3 3 5-6"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-row">
+        <div>
+          <span class="feature-tag">Community</span>
+          <h3 class="display">De kleedkamer sluit nooit.</h3>
+          <p>Bouw je profiel op en maak groepen voor je club, academie, team of ploeg. Elke wedstrijd wordt deel van een gedeeld verhaal.</p>
+        </div>
+        <div class="feature-visual">
+          <img src="https://images.unsplash.com/photo-1526232761682-d26e03ac148e?fm=jpg&q=80&w=1200&auto=format&fit=crop" alt="Kinderen spelen samen voetbal" loading="lazy">
+          <div class="icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 20c0-3 2.7-5 6-5s6 2 6 5M14.5 15.3c2.6.3 4.5 2 4.5 4.7"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHY -->
+  <section class="why">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Waarom PlayerNation</span>
+        <h2 class="display">Gebouwd om simpel te zijn.</h2>
+      </div>
+      <div class="why-grid">
+        <div class="why-card">
+          <div class="icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="6" width="14" height="12" rx="2"/><path d="M21 8l-4 3 4 3V8Z"/></svg></div>
+          <h3 class="display">Elke camera werkt</h3>
+          <p>AI-camera, gsm of gelijk wat ertussenin. Als je het gefilmd hebt, kunnen wij het analyseren.</p>
+        </div>
+        <div class="why-card">
+          <div class="icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M12 3a5 5 0 0 0-5 5c0 2 1 3 2 4s1 2 1 3h4c0-1 0-2 1-3s2-2 2-4a5 5 0 0 0-5-5Z"/><path d="M9.5 20h5"/></svg></div>
+          <h3 class="display">Antwoorden, geen dashboards</h3>
+          <p>Geen tagging, geen leercurve. Gewoon de statistieken, highlights en inzichten die je echt nodig hebt.</p>
+        </div>
+        <div class="why-card">
+          <div class="icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M8 21h8M12 17v4M6 4h12l-1 8a5 5 0 0 1-10 0L6 4Z"/><path d="M6 6H4a2 2 0 0 0 2 4M18 6h2a2 2 0 0 1-2 4"/></svg></div>
+          <h3 class="display">Bouwt je sportidentiteit</h3>
+          <p>PlayerNation wordt een levend overzicht van je prestaties, herinneringen en mijlpalen.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PERSONAS -->
+  <section id="voorwie">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Voor wie</span>
+        <h2 class="display">Gebouwd voor iedereen rond de sport.</h2>
+      </div>
+      <div class="persona-grid">
+        <div class="persona-cell"><div class="role">Speler</div><div class="tag">Volg je eigen ontwikkeling</div></div>
+        <div class="persona-cell"><div class="role">Ouder</div><div class="tag">Blijf betrokken</div></div>
+        <div class="persona-cell"><div class="role">Coach</div><div class="tag">Coach met inzichten</div></div>
+        <div class="persona-cell"><div class="role">Club</div><div class="tag">Beheer je gemeenschap</div></div>
+        <div class="persona-cell"><div class="role">Academie</div><div class="tag">Ontwikkel talent</div></div>
+        <div class="persona-cell"><div class="role">Scout</div><div class="tag">Ontdek spelers</div></div>
+        <div class="persona-cell"><div class="role">Competitie</div><div class="tag">Til de reeks naar een hoger niveau</div></div>
+        <div class="persona-cell"><div class="role">Team</div><div class="tag">Deel het verhaal samen</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TESTIMONIALS (placeholder — vervang door echte Belgische quotes) -->
+  <section style="padding-top:0;">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="eyebrow">Reacties</span>
+        <h2 class="display">Geliefd bij spelers, coaches &amp; ouders.</h2>
+      </div>
+      <div class="testi-scroll">
+        <div class="testi-card">
+          <p class="testi-quote">"Na elke wedstrijd weten mijn spelers meteen waar ze aan moeten werken. Dat bespaart mij uren aan handmatige analyse."</p>
+          <div class="testi-who">
+            <div class="testi-avatar">TC</div>
+            <div><div class="name">Trainer, U13</div><div class="role">Jeugdploeg</div></div>
+          </div>
+        </div>
+        <div class="testi-card">
+          <p class="testi-quote">"Eindelijk objectieve cijfers in plaats van enkel 'goed gespeeld'. Mijn zoon ziet nu zelf wat hij kan verbeteren."</p>
+          <div class="testi-who">
+            <div class="testi-avatar">OU</div>
+            <div><div class="name">Ouder</div><div class="role">Amateurvoetbal</div></div>
+          </div>
+        </div>
+        <div class="testi-card">
+          <p class="testi-quote">"De highlights delen we meteen na de wedstrijd met de groep. De motivatie is meteen voelbaar hoger."</p>
+          <div class="testi-who">
+            <div class="testi-avatar">SP</div>
+            <div><div class="name">Speler</div><div class="role">1e provinciale</div></div>
+          </div>
+        </div>
+      </div>
+      <p class="testi-note">Voorbeeldreacties — te vervangen door echte quotes van jouw Belgische klanten.</p>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" style="padding-top:40px;">
+    <div class="wrap" style="max-width:820px;">
+      <div class="section-head">
+        <span class="eyebrow">Veelgestelde vragen</span>
+        <h2 class="display">Nog vragen?</h2>
+      </div>
+
+      <details class="faq-item" open>
+        <summary>Welke sporten ondersteunt PlayerNation?<span class="plus">+</span></summary>
+        <p>PlayerNation ondersteunt momenteel voetbal, met meer sporten die in de toekomst worden toegevoegd.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Welk soort video's kan ik uploaden?<span class="plus">+</span></summary>
+        <p>Upload beelden van een AI-camera, een gsm of bijna elke andere videobron. Als je het kan filmen, kunnen wij het analyseren.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Heb ik speciale camera's, wearables of gps-trackers nodig?<span class="plus">+</span></summary>
+        <p>Nee. PlayerNation werkt met de video die je al hebt — geen dure apparatuur, sensoren of wearables nodig.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Hoeveel kost PlayerNation?<span class="plus">+</span></summary>
+        <p>Je eerste wedstrijdanalyse is volledig gratis. Daarna hangt de prijs af van de functies en analyses die je nodig hebt.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Voor wie is PlayerNation bedoeld?<span class="plus">+</span></summary>
+        <p>PlayerNation is gemaakt voor spelers, ouders, coaches, teams, clubs en academies. Ben je deel van het traject van een sporter, dan is PlayerNation voor jou.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Hoe lang duurt een wedstrijdanalyse?<span class="plus">+</span></summary>
+        <p>Wedstrijden worden binnen 24 uur verwerkt.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Wie is eigenaar van mijn video's en data?<span class="plus">+</span></summary>
+        <p>Jij bent eigenaar van je video's en data. We nemen privacy ernstig, verkopen nooit data aan derden en zijn volledig GDPR-conform.</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- FINAL CTA -->
+  <section id="contact" style="padding-top:0;">
+    <div class="final-cta">
+      <span class="eyebrow" style="color:var(--amber);">Klaar om te starten</span>
+      <h2 class="display">Klaar om mee te doen?</h2>
+      <p>37.247+ spelersprestaties geanalyseerd. De jouwe kan de volgende zijn.</p>
+      <div class="badge-row">
+        <a class="store-badge" style="background:var(--amber);color:var(--ink);border-color:var(--amber);" href="#">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M17.5 2h-11A2.5 2.5 0 0 0 4 4.5v15A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5v-15A2.5 2.5 0 0 0 17.5 2Z"/></svg>
+          <span><small>Download op</small>App Store</span>
+        </a>
+        <a class="store-badge" style="background:transparent;color:var(--chalk);border-color:rgba(245,242,232,0.4);" href="#">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3l14 9-14 9V3Z"/></svg>
+          <span><small>Beschikbaar op</small>Google Play</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="#top">
+          <img class="brand-mark" src="data:image/png;base64,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" alt="PlayerNation logo">
+        </a>
+        <p>Pro-niveau sportervaringen, beschikbaar voor iedereen. Officiële partner in België.</p>
+      </div>
+      <div>
+        <h4>Bedrijf</h4>
+        <ul>
+          <li><a href="#top">Home</a></li>
+          <li><a href="#functies">Functies</a></li>
+          <li><a href="#voorwie">Voor wie</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Juridisch</h4>
+        <ul>
+          <li><a href="#">Privacybeleid</a></li>
+          <li><a href="#">Algemene voorwaarden</a></li>
+          <li><a href="#">Verwerkersovereenkomst</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Contact</h4>
+        <ul>
+          <li><a href="#">Neem contact op</a></li>
+          <li><a href="#">Cookievoorkeuren</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 PlayerNation. Belgische partnerpagina.</span>
+      <div class="social-row">
+        <a href="#" aria-label="LinkedIn">in</a>
+        <a href="#" aria-label="Instagram">ig</a>
+      </div>
+    </div>
+  </div>
+</footer>
 
 <script>
-// ============================================================
-// VUL HIER JE SUPABASE GEGEVENS IN (Project Settings > API)
-// ============================================================
-const SUPABASE_URL = "https://sajuunjamflatbcfapdb.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_yHYs7UlwfBkYeKvpqNwYAQ__SDnbrAT";
-// ============================================================
+  const toggle = document.getElementById('navToggle');
+  const links = document.getElementById('navLinks');
+  const backdrop = document.getElementById('navBackdrop');
+  const closeBtn = document.getElementById('navClose');
 
-const CAT_LABEL = {OPWARMING:"Opwarming", WV:"Wedstrijdvorm", TV:"Tussenvorm", EINDSPEL:"Eindspel", KEEPER:"Keeper", ANDERE:"Andere"};
-const CAT_COLORS = {
-  OPWARMING: {bg:"#E8F5E9", fg:"#2E7D32"}, TV: {bg:"#FFF3E0", fg:"#E65100"}, WV: {bg:"#FFEBEE", fg:"#C62828"},
-  EINDSPEL: {bg:"#F3E5F5", fg:"#6A1B9A"}, KEEPER: {bg:"#E3F2FD", fg:"#1565C0"}, ANDERE: {bg:"#F5F5F5", fg:"#555555"}
-};
-const PLATFORMS = ["Instagram","TikTok","Facebook","YouTube","X/Twitter","Other"];
+  function openMenu(){ links.classList.add('open'); backdrop.classList.add('open'); }
+  function closeMenu(){ links.classList.remove('open'); backdrop.classList.remove('open'); }
 
-let supabaseClient = null;
-let DATA = [];
-let activeCat = "";
-let statFilter = "ALL";
-let searchTerm = "";
-let checkedPlatforms = [];
-let visibleCount = 20;
-let filtered = [];
-
-function isConfigured(){
-  return SUPABASE_URL.indexOf("PLAATS_HIER") === -1 && SUPABASE_ANON_KEY.indexOf("PLAATS_HIER") === -1;
-}
-
-if(!isConfigured()){
-  document.getElementById("configWarning").innerHTML =
-    '<div class="config-warning">⚠️ Nog niet verbonden met Supabase. Open dit bestand, vul <code>SUPABASE_URL</code> en <code>SUPABASE_ANON_KEY</code> in bovenaan het script (te vinden in je Supabase project onder Settings → API), en sla opnieuw op.</div>';
-  document.getElementById("loadState").style.display = "none";
-} else {
-  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  init();
-}
-
-async function init(){
-  await loadData();
-  document.getElementById("loadState").style.display = "none";
-  document.getElementById("appRoot").style.display = "block";
-  refreshSelectors();
-  bindStaticEvents();
-  bindTabs();
-  renderStats();
-  applyFilters();
-  renderSpotlight(filtered[0]);
-}
-
-async function loadData(){
-  let all = [];
-  let from = 0;
-  const pageSize = 1000;
-  while(true){
-    const { data, error } = await supabaseClient
-      .from("training_links")
-      .select("*")
-      .range(from, from + pageSize - 1)
-      .order("link_date", { ascending: false });
-    if(error){
-      document.getElementById("loadState").textContent = "Fout bij laden: " + error.message;
-      throw error;
-    }
-    all = all.concat(data);
-    if(data.length < pageSize) break;
-    from += pageSize;
-  }
-  DATA = all.map(function(r){
-    return { id: r.id, d: r.link_date, p: r.platform, l: r.link, c: r.category || "", s: r.status || "", n: r.note || "", u: !!r.used };
+  toggle.addEventListener('click', () => {
+    links.classList.contains('open') ? closeMenu() : openMenu();
   });
-  DATA.forEach(function(d){ d.effC = d.c; });
-}
-
-function parseDate(d){ if(!d) return new Date(0); const p=d.split("-"); return new Date(+p[2], +p[1]-1, +p[0]); }
-function todayStr(){ const t=new Date(); return String(t.getDate()).padStart(2,"0")+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+t.getFullYear(); }
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
-
-function uniqueVals(key){ return Array.from(new Set(DATA.map(function(d){return d[key];}).filter(Boolean))).sort(); }
-function populateSelect(id, values, allLabel, labelMap){
-  const el = document.getElementById(id);
-  const prevVal = el.value;
-  el.innerHTML = "";
-  const optAll = document.createElement("option");
-  optAll.value=""; optAll.textContent=allLabel;
-  el.appendChild(optAll);
-  values.forEach(function(v){
-    const o = document.createElement("option");
-    o.value=v; o.textContent = labelMap ? (labelMap[v]||v) : v;
-    el.appendChild(o);
-  });
-  el.value = prevVal;
-}
-function refreshSelectors(){
-  populateSelect("fPlatform", uniqueVals("p"), "Alle platforms");
-  populateSelect("fFav", ["Favoriet"], "Alle statussen");
-}
-
-function tabsHtml(){
-  const cats = ["OPWARMING","TV","WV","EINDSPEL","KEEPER","ANDERE"];
-  return cats.map(function(c){
-    const label = CAT_LABEL[c]||c;
-    const count = DATA.filter(function(d){
-      return d.effC===c && (statFilter === "USED" ? d.u : !d.u);
-    }).length;
-    const active = activeCat === c ? "active" : "";
-    const style = active ? ' style="background:'+CAT_COLORS[c].bg+';color:'+CAT_COLORS[c].fg+';border-color:'+CAT_COLORS[c].fg+';"' : "";
-    return '<button class="tab '+active+'" data-cat="'+c+'"'+style+'>'+label+' ('+count+')</button>';
-  }).join("");
-}
-
-const CATEGORY_ORDER = ["OPWARMING","TV","WV","EINDSPEL","KEEPER","ANDERE"];
-
-function renderStats(){
-  const total = DATA.length;
-  const fav = DATA.filter(function(d){return d.s==="Favoriet"||d.s==="Favori";}).length;
-  const activeItems = DATA.filter(function(d){return !d.u;});
-  const tagged = activeItems.filter(function(d){return d.effC;}).length;
-  const untagged = activeItems.length - tagged;
-  const used = DATA.filter(function(d){return d.u;}).length;
-  const cards = [
-    ["Totaal",total,"ALL"],
-    ["Favoriet",fav,"FAV"],
-    ["Gecategoriseerd",tagged,"TAGGED"],
-    ["Nog te doen",untagged,"NONE"],
-    ["Gebruikt",used,"USED"]
-  ];
-  document.getElementById("stats").innerHTML = cards.map(function(c){
-    const isActive = statFilter === c[2];
-    return '<button type="button" class="stat-card'+(isActive?' active':'')+'" data-stat="'+c[2]+'"><div class="label">'+c[0]+'</div><div class="value">'+c[1]+'</div></button>';
-  }).join("");
-  document.getElementById("subtitle").textContent = tagged + " video's gecategoriseerd, " + untagged + " nog te doen.";
-  document.querySelectorAll('.stat-card').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      const action = btn.getAttribute('data-stat');
-      statFilter = (statFilter === action) ? "ALL" : action;
-      activeCat = "";
-      document.getElementById("fFav").value = (statFilter === "FAV") ? "Favoriet" : "";
-      applyFilters();
-      renderStats();
-    });
-  });
-}
-
-function bindTabs(){
-  document.querySelectorAll('.tab').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      activeCat = (activeCat === btn.getAttribute('data-cat')) ? "" : btn.getAttribute('data-cat');
-      if(statFilter !== "USED"){
-        statFilter = "ALL";
-        document.getElementById("fFav").value = "";
-      }
-      applyFilters();
-      renderStats();
-    });
-  });
-}
-
-function matchesSearch(item, term){
-  if(!term) return true;
-  const hay = [item.n, item.p, item.effC ? (CAT_LABEL[item.effC]||item.effC) : "", item.l].join(" ").toLowerCase();
-  return hay.indexOf(term.toLowerCase()) !== -1;
-}
-
-function applyFilters(){
-  const p = document.getElementById("fPlatform").value;
-  const f = document.getElementById("fFav").value;
-  const checksEl = document.getElementById("platformChecks");
-  if(statFilter === "NONE"){
-    checksEl.style.display = "flex";
-    renderPlatformChecks();
-  } else {
-    checksEl.style.display = "none";
-  }
-  filtered = DATA.filter(function(d){
-    if(statFilter === "USED"){
-      if(!d.u) return false;
-    } else {
-      if(d.u) return false;
-      if(statFilter === "TAGGED" && !d.effC) return false;
-      if(statFilter === "NONE" && d.effC) return false;
-      if(statFilter === "NONE" && checkedPlatforms.length && checkedPlatforms.indexOf(d.p)===-1) return false;
-    }
-    if(activeCat && d.effC!==activeCat) return false;
-    if(p && d.p!==p) return false;
-    if(f && d.s!=="Favoriet" && d.s!=="Favori") return false;
-    if(!matchesSearch(d, searchTerm)) return false;
-    return true;
-  });
-  if(statFilter === "TAGGED" && !activeCat){
-    filtered.sort(function(a,b){
-      const ai = CATEGORY_ORDER.indexOf(a.effC); const bi = CATEGORY_ORDER.indexOf(b.effC);
-      if(ai !== bi) return (ai===-1?999:ai) - (bi===-1?999:bi);
-      return parseDate(b.d) - parseDate(a.d);
-    });
-  } else if(statFilter === "NONE"){
-    filtered.sort(function(a,b){ return parseDate(a.d) - parseDate(b.d); });
-  } else {
-    filtered.sort(function(a,b){ return parseDate(b.d) - parseDate(a.d); });
-  }
-  renderResetRow();
-  visibleCount = 20;
-  document.getElementById("tabs").innerHTML = tabsHtml();
-  bindTabs();
-  renderList();
-}
-
-function renderPlatformChecks(){
-  const checksEl = document.getElementById("platformChecks");
-  const quickPlatforms = ["Instagram","TikTok","Facebook"];
-  checksEl.innerHTML = quickPlatforms.map(function(pf){
-    const checked = checkedPlatforms.indexOf(pf) !== -1;
-    return '<label><input type="checkbox" data-platform="'+pf+'" '+(checked?'checked':'')+'>'+pf+'</label>';
-  }).join("");
-  checksEl.querySelectorAll('input[type=checkbox]').forEach(function(cb){
-    cb.addEventListener('change', function(){
-      const pf = cb.getAttribute('data-platform');
-      if(cb.checked){
-        if(checkedPlatforms.indexOf(pf)===-1) checkedPlatforms.push(pf);
-      } else {
-        checkedPlatforms = checkedPlatforms.filter(function(x){ return x!==pf; });
-      }
-      applyFilters();
-    });
-  });
-}
-
-function bindStaticEvents(){
-  document.getElementById("fPlatform").addEventListener("change", applyFilters);
-  document.getElementById("fFav").addEventListener("change", applyFilters);
-  document.getElementById("searchInput").addEventListener("input", function(e){ searchTerm = e.target.value; applyFilters(); });
-  document.getElementById("inspireBtn").addEventListener("click", function(){
-    const base = filtered.length ? filtered : DATA;
-    const pool = base.filter(function(d){ return !d.u; });
-    const finalPool = pool.length ? pool : base;
-    if(!finalPool.length){ renderSpotlight(null); return; }
-    renderSpotlight(finalPool[Math.floor(Math.random()*finalPool.length)]);
-  });
-  document.getElementById("openAddBtn").addEventListener("click", openAddModal);
-  document.getElementById("moreBtn").addEventListener("click", function(){ visibleCount += 30; renderList(); });
-  document.getElementById("modalOverlay").addEventListener("click", function(e){ if(e.target.id === "modalOverlay") closeModal(); });
-}
-
-function renderSpotlight(item){
-  const el = document.getElementById("spotlight");
-  if(!item){
-    el.classList.add("show");
-    el.style.background = "var(--green-light)";
-    el.innerHTML = '<p class="empty">Geen video gevonden voor dit filter.</p>';
-    return;
-  }
-  el.classList.add("show");
-  const col = item.effC ? CAT_COLORS[item.effC] : null;
-  el.style.background = col ? col.bg : "var(--green-light)";
-  el.innerHTML =
-    '<div class="row"><span class="platform">'+item.p+'</span>'+
-    (item.effC ? '<span class="badge" style="color:'+col.fg+';">'+(CAT_LABEL[item.effC]||item.effC)+'</span>' : '')+
-    ((item.s==="Favoriet"||item.s==="Favori") ? '<span class="star">★</span>' : '')+
-    '</div>'+
-    (item.n ? '<div class="note">'+escapeHtml(item.n)+'</div>' : '')+
-    '<a class="open" href="'+item.l+'" target="_blank" rel="noopener" style="color:'+(col?col.fg:'var(--green)')+';">Video openen →</a>';
-}
-
-function renderList(){
-  const slice = filtered.slice(0, visibleCount);
-  const listEl = document.getElementById("list");
-  if(slice.length === 0){
-    listEl.innerHTML = '<p class="empty">Geen resultaten.</p>';
-  } else {
-    listEl.innerHTML = slice.map(function(item, idx){
-      const col = item.effC ? CAT_COLORS[item.effC] : null;
-      const catBadge = item.effC
-        ? '<span class="cat" style="background:'+col.bg+';color:'+col.fg+';">'+(CAT_LABEL[item.effC]||item.effC)+'</span>'
-        : '<span class="cat" style="visibility:hidden;">-</span>';
-      return '<div class="item'+(item.u?' used':'')+'" data-id="'+item.id+'">'+
-        '<span class="idx">'+(idx+1)+'.</span>'+
-        '<a class="link-part" href="'+item.l+'" target="_blank" rel="noopener">'+
-          catBadge+
-          '<span class="note">'+escapeHtml(item.n||"")+'</span>'+
-          ((item.s==="Favoriet"||item.s==="Favori") ? '<span class="star">★</span>' : '')+
-        '</a>'+
-        '<span class="actions">'+
-          '<button class="icon-btn used-btn" title="'+(item.u?"Markeer als niet gebruikt":"Markeer als gebruikt")+'">'+(item.u?"↺":"✅")+'</button>'+
-          '<button class="icon-btn edit-btn" title="Bewerken">✏️</button>'+
-          '<button class="icon-btn delete-btn" title="Verwijderen">🗑️</button>'+
-        '</span>'+
-      '</div>';
-    }).join("");
-    listEl.querySelectorAll('.used-btn').forEach(function(btn){
-      btn.addEventListener('click', function(){ toggleUsed(btn.closest('.item').getAttribute('data-id')); });
-    });
-    listEl.querySelectorAll('.edit-btn').forEach(function(btn){
-      btn.addEventListener('click', function(){ openEditModal(btn.closest('.item').getAttribute('data-id')); });
-    });
-    listEl.querySelectorAll('.delete-btn').forEach(function(btn){
-      btn.addEventListener('click', function(){ deleteLink(btn.closest('.item').getAttribute('data-id')); });
-    });
-  }
-  const moreBtn = document.getElementById("moreBtn");
-  const remaining = filtered.length - visibleCount;
-  if(remaining > 0){ moreBtn.style.display="block"; moreBtn.textContent = remaining + " meer tonen"; }
-  else { moreBtn.style.display = "none"; }
-}
-
-function openModal(html){ document.getElementById("modalContent").innerHTML = html; document.getElementById("modalOverlay").classList.add("show"); }
-function closeModal(){ document.getElementById("modalOverlay").classList.remove("show"); }
-function catOptionsHtml(selected){ return Object.keys(CAT_LABEL).map(function(k){ return '<option value="'+k+'"'+(k===selected?' selected':'')+'>'+CAT_LABEL[k]+'</option>'; }).join(""); }
-function platformOptionsHtml(selected){ return PLATFORMS.map(function(p){ return '<option value="'+p+'"'+(p===selected?' selected':'')+'>'+p+'</option>'; }).join(""); }
-
-function openAddModal(){
-  openModal(
-    '<h3>Nieuwe link toevoegen</h3>'+
-    '<label>Link (URL)</label>'+
-    '<input type="url" id="m_url" placeholder="https://...">'+
-    '<label>Platform</label>'+
-    '<select id="m_platform">'+platformOptionsHtml("Instagram")+'</select>'+
-    '<label>Categorie</label>'+
-    '<select id="m_cat"><option value="">— geen —</option>'+catOptionsHtml("")+'</select>'+
-    '<label>Notitie</label>'+
-    '<textarea id="m_note" rows="2" placeholder="Korte omschrijving..."></textarea>'+
-    '<div class="checkbox-row"><input type="checkbox" id="m_fav"><label style="margin:0;">Favoriet</label></div>'+
-    '<div class="modal-actions"><button class="btn-secondary" id="m_cancel">Annuleren</button><button class="btn-primary" id="m_save">Opslaan</button></div>'
-  );
-  document.getElementById("m_cancel").addEventListener("click", closeModal);
-  document.getElementById("m_save").addEventListener("click", async function(){
-    const url = document.getElementById("m_url").value.trim();
-    if(!url){ alert("Vul een link in."); return; }
-    const payload = {
-      link_date: todayStr(),
-      platform: document.getElementById("m_platform").value,
-      link: url,
-      category: document.getElementById("m_cat").value || null,
-      status: document.getElementById("m_fav").checked ? "Favoriet" : null,
-      note: document.getElementById("m_note").value.trim() || null
-    };
-    const { error } = await supabaseClient.from("training_links").insert(payload);
-    if(error){ alert("Opslaan mislukt: " + error.message); return; }
-    closeModal();
-    await loadData();
-    refreshSelectors();
-    renderStats();
-    applyFilters();
-  });
-}
-
-function openEditModal(id){
-  const item = DATA.find(function(d){ return String(d.id) === String(id); });
-  if(!item) return;
-  openModal(
-    '<h3>Link bewerken</h3>'+
-    '<label>Categorie</label>'+
-    '<select id="m_cat"><option value="">— geen —</option>'+catOptionsHtml(item.c)+'</select>'+
-    '<label>Notitie</label>'+
-    '<textarea id="m_note" rows="2">'+escapeHtml(item.n||"")+'</textarea>'+
-    '<div class="checkbox-row"><input type="checkbox" id="m_fav" '+((item.s==="Favoriet"||item.s==="Favori")?'checked':'')+'><label style="margin:0;">Favoriet</label></div>'+
-    '<div class="modal-actions"><button class="btn-secondary" id="m_cancel">Annuleren</button><button class="btn-primary" id="m_save">Opslaan</button></div>'
-  );
-  document.getElementById("m_cancel").addEventListener("click", closeModal);
-  document.getElementById("m_save").addEventListener("click", async function(){
-    const payload = {
-      category: document.getElementById("m_cat").value || null,
-      note: document.getElementById("m_note").value.trim() || null,
-      status: document.getElementById("m_fav").checked ? "Favoriet" : null
-    };
-    const { error } = await supabaseClient.from("training_links").update(payload).eq("id", id);
-    if(error){ alert("Opslaan mislukt: " + error.message); return; }
-    closeModal();
-    await loadData();
-    renderStats();
-    applyFilters();
-  });
-}
-
-async function deleteLink(id){
-  if(!confirm("Deze link verwijderen?")) return;
-  const { error } = await supabaseClient.from("training_links").delete().eq("id", id);
-  if(error){ alert("Verwijderen mislukt: " + error.message); return; }
-  await loadData();
-  renderStats();
-  applyFilters();
-}
-
-async function toggleUsed(id){
-  const item = DATA.find(function(d){ return String(d.id) === String(id); });
-  if(!item) return;
-  const { error } = await supabaseClient.from("training_links").update({ used: !item.u }).eq("id", id);
-  if(error){ alert("Bijwerken mislukt: " + error.message); return; }
-  await loadData();
-  renderStats();
-  applyFilters();
-}
-
-async function resetAllUsed(){
-  if(!confirm("Alle 'gebruikt' markeringen resetten?")) return;
-  const { error } = await supabaseClient.from("training_links").update({ used: false }).eq("used", true);
-  if(error){ alert("Resetten mislukt: " + error.message); return; }
-  await loadData();
-  renderStats();
-  applyFilters();
-}
-
-async function resetCategoryUsed(cat){
-  const label = CAT_LABEL[cat] || cat;
-  if(!confirm("'Gebruikt' markering resetten voor alle "+label+" video's?")) return;
-  const { error } = await supabaseClient.from("training_links").update({ used: false }).eq("used", true).eq("category", cat);
-  if(error){ alert("Resetten mislukt: " + error.message); return; }
-  await loadData();
-  renderStats();
-  applyFilters();
-}
-
-function renderResetRow(){
-  const el = document.getElementById("resetRow");
-  if(statFilter !== "USED"){ el.style.display = "none"; el.innerHTML = ""; return; }
-  el.style.display = "flex";
-  let html = '<button type="button" class="danger" id="resetAllBtn">🔄 Reset alles</button>';
-  if(activeCat){
-    html += '<button type="button" id="resetCatBtn">🔄 Reset '+(CAT_LABEL[activeCat]||activeCat)+'</button>';
-  }
-  el.innerHTML = html;
-  document.getElementById("resetAllBtn").addEventListener("click", resetAllUsed);
-  const catBtn = document.getElementById("resetCatBtn");
-  if(catBtn){
-    catBtn.addEventListener("click", function(){ resetCategoryUsed(activeCat); });
-  }
-}
+  closeBtn.addEventListener('click', closeMenu);
+  backdrop.addEventListener('click', closeMenu);
+  links.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMenu));
 </script>
+
 </body>
 </html>
