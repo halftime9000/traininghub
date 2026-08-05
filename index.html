@@ -72,6 +72,7 @@
   .item .cat { font-size: 11px; padding: 2px 6px; border-radius: 6px; flex-shrink: 0; min-width: 32px; text-align: center; }
   .item .note { font-size: 13px; color: var(--text-secondary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .item .star { color: var(--accent); font-size: 13px; flex-shrink: 0; }
+  .item .used-date { font-size: 11px; color: var(--text-secondary); flex-shrink: 0; white-space: nowrap; }
   .item .idx { font-size: 12px; color: var(--text-secondary); flex-shrink: 0; width: 22px; text-align: right; }
   .item .actions { display: flex; gap: 4px; flex-shrink: 0; }
   .icon-btn { background: none; border: none; cursor: pointer; font-size: 14px; padding: 4px; opacity: 0.55; }
@@ -368,12 +369,16 @@ async function loadData(){
     from += pageSize;
   }
   DATA = all.map(function(r){
-    return { id: r.id, d: r.link_date, p: r.platform, l: r.link, c: r.category || "", s: r.status || "", n: r.note || "", u: !!r.used, t: !!r.in_today };
+    return { id: r.id, d: r.link_date, p: r.platform, l: r.link, c: r.category || "", s: r.status || "", n: r.note || "", u: !!r.used, t: !!r.in_today, ua: r.used_at ? formatDateShort(r.used_at) : "" };
   });
   DATA.forEach(function(d){ d.effC = d.c; });
 }
 
 function parseDate(d){ if(!d) return new Date(0); const p=d.split("-"); return new Date(+p[2], +p[1]-1, +p[0]); }
+function formatDateShort(iso){
+  const dt = new Date(iso);
+  return String(dt.getDate()).padStart(2,"0")+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+dt.getFullYear();
+}
 function todayStr(){ const t=new Date(); return String(t.getDate()).padStart(2,"0")+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+t.getFullYear(); }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
 
@@ -615,12 +620,14 @@ function renderList(){
         : '<span class="cat" style="visibility:hidden;">-</span>';
       const inToday = isInToday(item.id);
       const todayBtn = '<button class="icon-btn today-btn" title="'+(inToday?"Uit training vandaag halen":"Toevoegen aan training vandaag")+'">'+(inToday?"❌":"📋")+'</button>';
-      const usedBtn = statFilter === "TODAY" ? "" : '<button class="icon-btn used-btn" title="'+(item.u?"Markeer als niet gebruikt":"Markeer als gebruikt")+'">'+(item.u?"↺":"✅")+'</button>';
+      const usedBtn = '<button class="icon-btn used-btn" title="'+(item.u?"Markeer als niet gebruikt":"Markeer als gebruikt")+'">'+(item.u?"↺":"✅")+'</button>';
+      const usedDate = (statFilter === "USED" && item.ua) ? '<span class="used-date">'+item.ua+'</span>' : '';
       return '<div class="item'+(item.u?' used':'')+'" data-id="'+item.id+'">'+
         '<span class="idx">'+(idx+1)+'.</span>'+
         '<a class="link-part" href="'+item.l+'" target="_blank" rel="noopener">'+
           catBadge+
           '<span class="note">'+escapeHtml(item.n||"")+'</span>'+
+          usedDate+
           ((item.s==="Favoriet"||item.s==="Favori") ? '<span class="star">★</span>' : '')+
         '</a>'+
         '<span class="actions">'+
@@ -784,7 +791,9 @@ async function deleteLink(id){
 async function toggleUsed(id){
   const item = DATA.find(function(d){ return String(d.id) === String(id); });
   if(!item) return;
-  const { error } = await supabaseClient.from("training_links").update({ used: !item.u }).eq("id", id);
+  const nowUsed = !item.u;
+  const payload = { used: nowUsed, used_at: nowUsed ? new Date().toISOString() : null };
+  const { error } = await supabaseClient.from("training_links").update(payload).eq("id", id);
   if(error){ alert("Bijwerken mislukt: " + error.message); return; }
   await loadData();
   renderStats();
