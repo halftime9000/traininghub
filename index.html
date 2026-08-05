@@ -335,6 +335,11 @@ function applyFilters(){
   const p = document.getElementById("fPlatform").value;
   const f = document.getElementById("fFav").value;
   const checksEl = document.getElementById("platformChecks");
+  const inspireBtn = document.getElementById("inspireBtn");
+  const hideInspire = (statFilter === "NONE" || statFilter === "USED" || statFilter === "TODAY");
+  inspireBtn.style.display = hideInspire ? "none" : "block";
+  const spotlightEl = document.getElementById("spotlight");
+  if(hideInspire){ spotlightEl.classList.remove("show"); spotlightEl.innerHTML = ""; }
   if(statFilter === "TODAY"){
     checksEl.style.display = "none";
     filtered = todayList.map(function(x){ return Object.assign({}, x, {effC: x.c, d: "", s: ""}); });
@@ -513,6 +518,10 @@ function renderList(){
 function openModal(html){ document.getElementById("modalContent").innerHTML = html; document.getElementById("modalOverlay").classList.add("show"); }
 function closeModal(){ document.getElementById("modalOverlay").classList.remove("show"); }
 function catOptionsHtml(selected){ return Object.keys(CAT_LABEL).map(function(k){ return '<option value="'+k+'"'+(k===selected?' selected':'')+'>'+CAT_LABEL[k]+'</option>'; }).join(""); }
+function noteSuggestionsHtml(){
+  const notes = Array.from(new Set(DATA.map(function(d){ return (d.n||"").trim(); }).filter(Boolean))).sort();
+  return notes.map(function(n){ return '<option value="'+escapeHtml(n)+'">'; }).join("");
+}
 function platformOptionsHtml(selected){ return PLATFORMS.map(function(p){ return '<option value="'+p+'"'+(p===selected?' selected':'')+'>'+p+'</option>'; }).join(""); }
 
 function openAddModal(){
@@ -525,7 +534,8 @@ function openAddModal(){
     '<label>Categorie</label>'+
     '<select id="m_cat"><option value="">— geen —</option>'+catOptionsHtml("")+'</select>'+
     '<label>Notitie</label>'+
-    '<textarea id="m_note" rows="2" placeholder="Korte omschrijving..."></textarea>'+
+    '<input type="text" id="m_note" list="noteSuggestions" placeholder="Korte omschrijving...">'+
+    '<datalist id="noteSuggestions">'+noteSuggestionsHtml()+'</datalist>'+
     '<div class="checkbox-row"><input type="checkbox" id="m_fav"><label style="margin:0;">Favoriet</label></div>'+
     '<div class="modal-actions"><button class="btn-secondary" id="m_cancel">Annuleren</button><button class="btn-primary" id="m_save">Opslaan</button></div>'
   );
@@ -559,7 +569,8 @@ function openEditModal(id){
     '<label>Categorie</label>'+
     '<select id="m_cat"><option value="">— geen —</option>'+catOptionsHtml(item.c)+'</select>'+
     '<label>Notitie</label>'+
-    '<textarea id="m_note" rows="2">'+escapeHtml(item.n||"")+'</textarea>'+
+    '<input type="text" id="m_note" list="noteSuggestions" value="'+escapeHtml(item.n||"")+'">'+
+    '<datalist id="noteSuggestions">'+noteSuggestionsHtml()+'</datalist>'+
     '<div class="checkbox-row"><input type="checkbox" id="m_fav" '+((item.s==="Favoriet"||item.s==="Favori")?'checked':'')+'><label style="margin:0;">Favoriet</label></div>'+
     '<div class="modal-actions"><button class="btn-secondary" id="m_cancel">Annuleren</button><button class="btn-primary" id="m_save">Opslaan</button></div>'
   );
