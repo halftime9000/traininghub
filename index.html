@@ -92,6 +92,16 @@
   .load-state { text-align: center; padding: 40px 0; color: var(--text-secondary); font-size: 14px; }
   .config-warning { background: #FFF3E0; border: 1px solid #E65100; border-radius: 10px; padding: 14px; margin-bottom: 16px; font-size: 13px; line-height: 1.5; }
   .config-warning code { background: white; padding: 1px 4px; border-radius: 4px; }
+  .account-badge { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .account-badge span { font-size: 12px; color: var(--text-secondary); }
+  .account-badge button { font-size: 12px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; color: var(--text-secondary); }
+  .auth-screen { display: flex; justify-content: center; padding: 30px 0; }
+  .auth-box { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 24px; width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 10px; }
+  .auth-box h3 { margin: 0 0 6px; font-size: 18px; text-align: center; }
+  .auth-box input { padding: 10px; border-radius: 8px; border: 1px solid var(--border); font-size: 14px; }
+  .auth-switch { font-size: 13px; text-align: center; color: var(--text-secondary); margin: 4px 0 0; }
+  .auth-switch a { color: var(--green); font-weight: 600; text-decoration: none; }
+  .auth-error { font-size: 12px; color: var(--danger); text-align: center; margin: 0; min-height: 14px; }
 </style>
 </head>
 <body>
@@ -110,9 +120,22 @@
       <path d="M21 15.5 L25 18.4 L23.4 23.3 L18.6 23.3 L17 18.4 Z" fill="#14213D" opacity="0.9"/>
     </svg>
     <h1>HalfTime Training Hub</h1>
+    <div id="accountBadge" class="account-badge" style="display:none;"></div>
   </div>
   <p class="subtitle" id="subtitle"></p>
   <div id="configWarning"></div>
+
+  <div id="authScreen" class="auth-screen" style="display:none;">
+    <div class="auth-box">
+      <h3 id="authTitle">Inloggen</h3>
+      <input type="email" id="authEmail" placeholder="E-mailadres" autocomplete="email">
+      <input type="password" id="authPassword" placeholder="Wachtwoord" autocomplete="current-password">
+      <button class="btn-primary" id="authSubmitBtn" type="button">Inloggen</button>
+      <p class="auth-switch" id="authSwitchText">Nog geen account? <a href="#" id="authSwitchLink">Account aanmaken</a></p>
+      <p class="auth-error" id="authError"></p>
+    </div>
+  </div>
+
   <div id="appRoot" style="display:none;">
     <div class="stats" id="stats"></div>
     <div class="search-box"><input type="text" id="searchInput" placeholder="Zoek op trefwoord, categorie of platform..."></div>
@@ -126,12 +149,14 @@
     <div class="btn-row">
       <button class="inspire-btn" id="inspireBtn">💡 Geef me inspiratie</button>
       <button class="add-btn" id="openAddBtn">+ Link</button>
+      <button class="add-btn" id="openPdfBtn">+ PDF</button>
+      <input type="file" id="pdfFileInput" accept="application/pdf" style="display:none;">
     </div>
     <div class="spotlight" id="spotlight"></div>
     <div class="list" id="list"></div>
     <button class="more-btn" id="moreBtn" style="display:none;"></button>
   </div>
-  <div id="loadState" class="load-state">Bezig met laden...</div>
+  <div id="loadState" class="load-state" style="display:none;">Bezig met laden...</div>
   <footer>Gegevens worden live opgeslagen in Supabase · HalfTime Training Hub</footer>
 
   <div class="modal-overlay" id="modalOverlay">
@@ -151,7 +176,7 @@ const CAT_COLORS = {
   OPWARMING: {bg:"#E8F5E9", fg:"#2E7D32"}, TV: {bg:"#FFF3E0", fg:"#E65100"}, WV: {bg:"#FFEBEE", fg:"#C62828"},
   EINDSPEL: {bg:"#F3E5F5", fg:"#6A1B9A"}, KEEPER: {bg:"#E3F2FD", fg:"#1565C0"}, ANDERE: {bg:"#F5F5F5", fg:"#555555"}
 };
-const PLATFORMS = ["Instagram","TikTok","Facebook","YouTube","X/Twitter","Other"];
+const PLATFORMS = ["Instagram","TikTok","Facebook","YouTube","X/Twitter","PDF","Other"];
 
 let supabaseClient = null;
 let DATA = [];
@@ -198,10 +223,95 @@ function isConfigured(){
 if(!isConfigured()){
   document.getElementById("configWarning").innerHTML =
     '<div class="config-warning">⚠️ Nog niet verbonden met Supabase. Open dit bestand, vul <code>SUPABASE_URL</code> en <code>SUPABASE_ANON_KEY</code> in bovenaan het script (te vinden in je Supabase project onder Settings → API), en sla opnieuw op.</div>';
-  document.getElementById("loadState").style.display = "none";
 } else {
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  bootstrap();
+}
+
+let currentUser = null;
+let authMode = "signin";
+
+async function bootstrap(){
+  const { data } = await supabaseClient.auth.getSession();
+  if(data.session){
+    currentUser = data.session.user;
+    showApp();
+  } else {
+    showAuth();
+  }
+  supabaseClient.auth.onAuthStateChange(function(event, session){
+    if(event === "SIGNED_IN"){
+      currentUser = session.user;
+      showApp();
+    } else if(event === "SIGNED_OUT"){
+      currentUser = null;
+      showAuth();
+    }
+  });
+}
+
+function showAuth(){
+  document.getElementById("authScreen").style.display = "flex";
+  document.getElementById("appRoot").style.display = "none";
+  document.getElementById("loadState").style.display = "none";
+  document.getElementById("accountBadge").style.display = "none";
+  bindAuthEvents();
+}
+
+function showApp(){
+  document.getElementById("authScreen").style.display = "none";
+  document.getElementById("loadState").style.display = "block";
+  const badge = document.getElementById("accountBadge");
+  badge.style.display = "flex";
+  badge.innerHTML = '<span>'+escapeHtml(currentUser.email)+'</span><button id="logoutBtn" type="button">Uitloggen</button>';
+  document.getElementById("logoutBtn").addEventListener("click", async function(){
+    await supabaseClient.auth.signOut();
+  });
   init();
+}
+
+let authEventsBound = false;
+function bindAuthEvents(){
+  if(authEventsBound) return;
+  authEventsBound = true;
+  document.getElementById("authSwitchLink").addEventListener("click", function(e){
+    e.preventDefault();
+    authMode = (authMode === "signin") ? "signup" : "signin";
+    updateAuthUI();
+  });
+  document.getElementById("authSubmitBtn").addEventListener("click", handleAuthSubmit);
+  document.getElementById("authPassword").addEventListener("keydown", function(e){
+    if(e.key === "Enter") handleAuthSubmit();
+  });
+}
+
+function updateAuthUI(){
+  const isSignup = authMode === "signup";
+  document.getElementById("authTitle").textContent = isSignup ? "Account aanmaken" : "Inloggen";
+  document.getElementById("authSubmitBtn").textContent = isSignup ? "Account aanmaken" : "Inloggen";
+  document.getElementById("authSwitchText").innerHTML = isSignup
+    ? 'Al een account? <a href="#" id="authSwitchLink">Inloggen</a>'
+    : 'Nog geen account? <a href="#" id="authSwitchLink">Account aanmaken</a>';
+  document.getElementById("authError").textContent = "";
+  authEventsBound = false;
+  bindAuthEvents();
+}
+
+async function handleAuthSubmit(){
+  const email = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  const errEl = document.getElementById("authError");
+  errEl.textContent = "";
+  if(!email || !password){ errEl.textContent = "Vul e-mail en wachtwoord in."; return; }
+  if(authMode === "signup"){
+    const { error } = await supabaseClient.auth.signUp({ email: email, password: password });
+    if(error){ errEl.textContent = error.message; return; }
+    errEl.style.color = "var(--green)";
+    errEl.textContent = "Account aangemaakt! Check je e-mail om te bevestigen, log daarna in.";
+  } else {
+    const { error } = await supabaseClient.auth.signInWithPassword({ email: email, password: password });
+    if(error){ errEl.textContent = error.message; return; }
+  }
 }
 
 async function init(){
@@ -428,6 +538,16 @@ function bindStaticEvents(){
     renderSpotlight(finalPool[Math.floor(Math.random()*finalPool.length)]);
   });
   document.getElementById("openAddBtn").addEventListener("click", openAddModal);
+  document.getElementById("openPdfBtn").addEventListener("click", function(){
+    document.getElementById("pdfFileInput").value = "";
+    document.getElementById("pdfFileInput").click();
+  });
+  document.getElementById("pdfFileInput").addEventListener("change", function(e){
+    const file = e.target.files[0];
+    if(!file) return;
+    if(file.size > 20 * 1024 * 1024){ alert("Bestand is te groot (max 20MB)."); return; }
+    openPdfModal(file);
+  });
   document.getElementById("moreBtn").addEventListener("click", function(){ visibleCount += 30; renderList(); });
   document.getElementById("modalOverlay").addEventListener("click", function(e){ if(e.target.id === "modalOverlay") closeModal(); });
 }
@@ -549,7 +669,49 @@ function openAddModal(){
       link: url,
       category: document.getElementById("m_cat").value || null,
       status: document.getElementById("m_fav").checked ? "Favoriet" : null,
-      note: document.getElementById("m_note").value.trim() || null
+      note: document.getElementById("m_note").value.trim() || null,
+      user_id: currentUser ? currentUser.id : null
+    };
+    const { error } = await supabaseClient.from("training_links").insert(payload);
+    if(error){ alert("Opslaan mislukt: " + error.message); return; }
+    closeModal();
+    await loadData();
+    refreshSelectors();
+    renderStats();
+    applyFilters();
+  });
+}
+
+function openPdfModal(file){
+  openModal(
+    '<h3>PDF toevoegen</h3>'+
+    '<p style="font-size:13px;color:var(--text-secondary);margin:0;">📄 '+escapeHtml(file.name)+'</p>'+
+    '<label>Categorie</label>'+
+    '<select id="m_cat"><option value="">— geen —</option>'+catOptionsHtml("")+'</select>'+
+    '<label>Notitie</label>'+
+    '<input type="text" id="m_note" list="noteSuggestions" placeholder="Korte omschrijving...">'+
+    '<datalist id="noteSuggestions">'+noteSuggestionsHtml()+'</datalist>'+
+    '<div class="checkbox-row"><input type="checkbox" id="m_fav"><label style="margin:0;">Favoriet</label></div>'+
+    '<div class="modal-actions"><button class="btn-secondary" id="m_cancel">Annuleren</button><button class="btn-primary" id="m_save">Uploaden</button></div>'
+  );
+  document.getElementById("m_cancel").addEventListener("click", closeModal);
+  document.getElementById("m_save").addEventListener("click", async function(){
+    const saveBtn = document.getElementById("m_save");
+    saveBtn.textContent = "Bezig...";
+    saveBtn.disabled = true;
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const path = currentUser.id + "/" + Date.now() + "_" + safeName;
+    const { error: uploadError } = await supabaseClient.storage.from("training-pdfs").upload(path, file);
+    if(uploadError){ alert("Uploaden mislukt: " + uploadError.message); saveBtn.textContent = "Uploaden"; saveBtn.disabled = false; return; }
+    const { data: urlData } = supabaseClient.storage.from("training-pdfs").getPublicUrl(path);
+    const payload = {
+      link_date: todayStr(),
+      platform: "PDF",
+      link: urlData.publicUrl,
+      category: document.getElementById("m_cat").value || null,
+      status: document.getElementById("m_fav").checked ? "Favoriet" : null,
+      note: document.getElementById("m_note").value.trim() || file.name,
+      user_id: currentUser ? currentUser.id : null
     };
     const { error } = await supabaseClient.from("training_links").insert(payload);
     if(error){ alert("Opslaan mislukt: " + error.message); return; }
