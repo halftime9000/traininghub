@@ -69,7 +69,7 @@
   .item { display: flex; align-items: center; gap: 8px; padding: 10px 4px; border-bottom: 1px solid var(--border); }
   .item.used { opacity: 0.45; }
   .item .link-part { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; text-decoration: none; color: var(--text); }
-  .item .cat { font-size: 11px; padding: 2px 6px; border-radius: 6px; flex-shrink: 0; min-width: 60px; text-align: center; }
+  .item .cat { font-size: 11px; padding: 2px 6px; border-radius: 6px; flex-shrink: 0; min-width: 32px; text-align: center; }
   .item .note { font-size: 13px; color: var(--text-secondary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .item .star { color: var(--accent); font-size: 13px; flex-shrink: 0; }
   .item .idx { font-size: 12px; color: var(--text-secondary); flex-shrink: 0; width: 22px; text-align: right; }
@@ -172,6 +172,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_yHYs7UlwfBkYeKvpqNwYAQ__SDnbrAT";
 // ============================================================
 
 const CAT_LABEL = {OPWARMING:"Opwarming", WV:"Wedstrijdvorm", TV:"Tussenvorm", EINDSPEL:"Eindspel", KEEPER:"Keeper", ANDERE:"Andere"};
+const CAT_SHORT = {OPWARMING:"Opw", WV:"WV", TV:"TV", EINDSPEL:"Eind", KEEPER:"GK", ANDERE:"And"};
 const CAT_COLORS = {
   OPWARMING: {bg:"#E8F5E9", fg:"#2E7D32"}, TV: {bg:"#FFF3E0", fg:"#E65100"}, WV: {bg:"#FFEBEE", fg:"#C62828"},
   EINDSPEL: {bg:"#F3E5F5", fg:"#6A1B9A"}, KEEPER: {bg:"#E3F2FD", fg:"#1565C0"}, ANDERE: {bg:"#F5F5F5", fg:"#555555"}
@@ -377,7 +378,7 @@ function refreshSelectors(){
 function tabsHtml(){
   const cats = ["OPWARMING","TV","WV","EINDSPEL","KEEPER","ANDERE"];
   return cats.map(function(c){
-    const label = CAT_LABEL[c]||c;
+    const label = CAT_SHORT[c]||c;
     const count = DATA.filter(function(d){
       return d.effC===c && (statFilter === "USED" ? d.u : !d.u);
     }).length;
@@ -566,7 +567,7 @@ function renderSpotlight(item){
   const inToday = isInToday(item.id);
   el.innerHTML =
     '<div class="row"><span class="platform">'+item.p+'</span>'+
-    (item.effC ? '<span class="badge" style="color:'+col.fg+';">'+(CAT_LABEL[item.effC]||item.effC)+'</span>' : '')+
+    (item.effC ? '<span class="badge" style="color:'+col.fg+';">'+(CAT_SHORT[item.effC]||item.effC)+'</span>' : '')+
     ((item.s==="Favoriet"||item.s==="Favori") ? '<span class="star">★</span>' : '')+
     '<button class="icon-btn spot-today-btn" style="margin-left:auto;font-size:16px;" title="'+(inToday?"Uit training vandaag halen":"Toevoegen aan training vandaag")+'">'+(inToday?"❌":"📋")+'</button>'+
     '</div>'+
@@ -590,7 +591,7 @@ function renderList(){
     listEl.innerHTML = slice.map(function(item, idx){
       const col = item.effC ? CAT_COLORS[item.effC] : null;
       const catBadge = item.effC
-        ? '<span class="cat" style="background:'+col.bg+';color:'+col.fg+';">'+(CAT_LABEL[item.effC]||item.effC)+'</span>'
+        ? '<span class="cat" style="background:'+col.bg+';color:'+col.fg+';">'+(CAT_SHORT[item.effC]||item.effC)+'</span>'
         : '<span class="cat" style="visibility:hidden;">-</span>';
       const inToday = isInToday(item.id);
       const todayBtn = '<button class="icon-btn today-btn" title="'+(inToday?"Uit training vandaag halen":"Toevoegen aan training vandaag")+'">'+(inToday?"❌":"📋")+'</button>';
