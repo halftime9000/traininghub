@@ -175,7 +175,7 @@ const CAT_LABEL = {OPWARMING:"Opwarming", WV:"Wedstrijdvorm", TV:"Tussenvorm", E
 const CAT_SHORT = {OPWARMING:"Opw", WV:"WV", TV:"TV", EINDSPEL:"Eind", KEEPER:"GK", ANDERE:"And"};
 const CAT_COLORS = {
   OPWARMING: {bg:"#E8F5E9", fg:"#2E7D32"}, TV: {bg:"#FFF3E0", fg:"#E65100"}, WV: {bg:"#FFEBEE", fg:"#C62828"},
-  EINDSPEL: {bg:"#F3E5F5", fg:"#6A1B9A"}, KEEPER: {bg:"#E3F2FD", fg:"#1565C0"}, ANDERE: {bg:"#F5F5F5", fg:"#555555"}
+  EINDSPEL: {bg:"#F3E5F5", fg:"#6A1B9A"}, KEEPER: {bg:"#E3F2FD", fg:"#1565C0"}, ANDERE: {bg:"#EFEBE9", fg:"#6D4C41"}
 };
 const PLATFORMS = ["Instagram","TikTok","Facebook","YouTube","X/Twitter","PDF","Other"];
 
@@ -378,12 +378,15 @@ function refreshSelectors(){
 function tabsHtml(){
   const cats = ["OPWARMING","TV","WV","EINDSPEL","KEEPER","ANDERE"];
   return cats.map(function(c){
-    const label = CAT_SHORT[c]||c;
+    const label = CAT_LABEL[c]||c;
     const count = DATA.filter(function(d){
       return d.effC===c && (statFilter === "USED" ? d.u : !d.u);
     }).length;
     const active = activeCat === c ? "active" : "";
-    const style = active ? ' style="background:'+CAT_COLORS[c].bg+';color:'+CAT_COLORS[c].fg+';border-color:'+CAT_COLORS[c].fg+';"' : "";
+    const col = CAT_COLORS[c];
+    const style = active
+      ? ' style="background:'+col.fg+';color:#fff;border-color:'+col.fg+';"'
+      : ' style="background:'+col.bg+';color:'+col.fg+';border-color:'+col.fg+';"';
     return '<button class="tab '+active+'" data-cat="'+c+'"'+style+'>'+label+' ('+count+')</button>';
   }).join("");
 }
