@@ -130,6 +130,7 @@
       <h3 id="authTitle">Inloggen</h3>
       <input type="email" id="authEmail" placeholder="E-mailadres" autocomplete="email">
       <input type="password" id="authPassword" placeholder="Wachtwoord" autocomplete="current-password">
+      <div class="checkbox-row"><input type="checkbox" id="authRemember" checked><label style="margin:0;" for="authRemember">Onthoud mij</label></div>
       <button class="btn-primary" id="authSubmitBtn" type="button">Inloggen</button>
       <p class="auth-switch" id="authSwitchText">Nog geen account? <a href="#" id="authSwitchLink">Account aanmaken</a></p>
       <p class="auth-error" id="authError"></p>
@@ -225,7 +226,20 @@ if(!isConfigured()){
   document.getElementById("configWarning").innerHTML =
     '<div class="config-warning">⚠️ Nog niet verbonden met Supabase. Open dit bestand, vul <code>SUPABASE_URL</code> en <code>SUPABASE_ANON_KEY</code> in bovenaan het script (te vinden in je Supabase project onder Settings → API), en sla opnieuw op.</div>';
 } else {
-  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const REMEMBER_KEY = "halftime_remember_me";
+const rememberStorage = {
+  getItem: function(key){ return localStorage.getItem(key) || sessionStorage.getItem(key); },
+  setItem: function(key, value){
+    const remember = localStorage.getItem(REMEMBER_KEY) !== "0";
+    if(remember){ localStorage.setItem(key, value); sessionStorage.removeItem(key); }
+    else { sessionStorage.setItem(key, value); localStorage.removeItem(key); }
+  },
+  removeItem: function(key){ localStorage.removeItem(key); sessionStorage.removeItem(key); }
+};
+
+supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { storage: rememberStorage, persistSession: true, autoRefreshToken: true }
+});
   bootstrap();
 }
 
@@ -301,8 +315,10 @@ function updateAuthUI(){
 async function handleAuthSubmit(){
   const email = document.getElementById("authEmail").value.trim();
   const password = document.getElementById("authPassword").value;
+  const remember = document.getElementById("authRemember").checked;
   const errEl = document.getElementById("authError");
   errEl.textContent = "";
+  localStorage.setItem(REMEMBER_KEY, remember ? "1" : "0");
   if(!email || !password){ errEl.textContent = "Vul e-mail en wachtwoord in."; return; }
   if(authMode === "signup"){
     const { error } = await supabaseClient.auth.signUp({ email: email, password: password });
