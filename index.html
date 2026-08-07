@@ -73,6 +73,7 @@
   .item .note { font-size: 13px; color: var(--text-secondary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .item .star { color: var(--accent); font-size: 13px; flex-shrink: 0; }
   .item .used-date { font-size: 11px; color: var(--text-secondary); flex-shrink: 0; white-space: nowrap; }
+  .item .meta-tag { font-size: 11px; color: var(--text-secondary); flex-shrink: 0; white-space: nowrap; }
   .item .idx { font-size: 12px; color: var(--text-secondary); flex-shrink: 0; width: 22px; text-align: right; }
   .item .actions { display: flex; gap: 4px; flex-shrink: 0; }
   .icon-btn { background: none; border: none; cursor: pointer; font-size: 14px; padding: 4px; opacity: 0.55; }
@@ -149,6 +150,17 @@
       <select id="fPlatform"></select>
       <select id="fFav"></select>
     </div>
+    <div class="controls">
+      <select id="fDifficulty">
+        <option value="">Alle niveaus</option>
+        <option value="1">★☆☆☆☆</option>
+        <option value="2">★★☆☆☆</option>
+        <option value="3">★★★☆☆</option>
+        <option value="4">★★★★☆</option>
+        <option value="5">★★★★★</option>
+      </select>
+      <input type="number" id="fPlayers" min="1" max="30" placeholder="Aantal spelers">
+    </div>
     <div class="btn-row">
       <button class="inspire-btn" id="inspireBtn">💡 Geef me inspiratie</button>
       <button class="add-btn" id="openAddBtn">+ Link</button>
@@ -180,7 +192,14 @@ const CAT_COLORS = {
   OPWARMING: {bg:"#E8F5E9", fg:"#2E7D32"}, TT: {bg:"#E0F7FA", fg:"#00838F"}, TV: {bg:"#FFF3E0", fg:"#E65100"}, WV: {bg:"#FFEBEE", fg:"#C62828"},
   EINDSPEL: {bg:"#F3E5F5", fg:"#6A1B9A"}, KEEPER: {bg:"#E3F2FD", fg:"#1565C0"}, ANDERE: {bg:"#EFEBE9", fg:"#6D4C41"}
 };
-const SUBCATS = ["1v1","2v1","3v1","Small groep"];
+const SUBCAT_OPTIONS = {
+  OPWARMING: ["Dynamisch","Passing","Conditie","Wedstrijdopwarming","Balcontrole","Andere"],
+  TT: ["1v1","2v1","3v1","Small groep"],
+  TV: ["Passing","Trappen","Omschakelen","Aanvallen","Verdedigen","Rondo","Afwerking","Andere"],
+  WV: ["Omschakelen","Vrijspel","Speciale thema","Andere"],
+  EINDSPEL: ["Fun game","Positiespel","Kleine partij","Andere"],
+  KEEPER: ["Reflexen","Positiespel","Afstoten","Andere"]
+};
 const PLATFORMS = ["Instagram","TikTok","Facebook","YouTube","X/Twitter","PDF","Other"];
 
 let supabaseClient = null;
@@ -372,7 +391,7 @@ async function loadData(){
     from += pageSize;
   }
   DATA = all.map(function(r){
-    return { id: r.id, d: r.link_date, p: r.platform, l: r.link, c: r.category || "", sc: r.subcategory || "", s: r.status || "", n: r.note || "", u: !!r.used, t: !!r.in_today, ua: r.used_at ? formatDateShort(r.used_at) : "" };
+    return { id: r.id, d: r.link_date, p: r.platform, l: r.link, c: r.category || "", sc: r.subcategory || "", s: r.status || "", n: r.note || "", u: !!r.used, t: !!r.in_today, ua: r.used_at ? formatDateShort(r.used_at) : "", pc: r.player_count || null, diff: r.difficulty || null };
   });
   DATA.forEach(function(d){ d.effC = d.c; });
 }
@@ -484,6 +503,8 @@ function matchesSearch(item, term){
 function applyFilters(){
   const p = document.getElementById("fPlatform").value;
   const f = document.getElementById("fFav").value;
+  const diffFilter = parseInt(document.getElementById("fDifficulty").value, 10);
+  const playersFilter = parseInt(document.getElementById("fPlayers").value, 10);
   const checksEl = document.getElementById("platformChecks");
   const inspireBtn = document.getElementById("inspireBtn");
   const hideInspire = (statFilter === "NONE" || statFilter === "USED" || statFilter === "TODAY");
@@ -508,9 +529,11 @@ function applyFilters(){
       if(statFilter === "NONE" && checkedPlatforms.length && checkedPlatforms.indexOf(d.p)===-1) return false;
     }
     if(activeCat && d.effC!==activeCat) return false;
-    if(activeCat === "TT" && activeSubCat && d.sc !== activeSubCat) return false;
+    if(activeCat && activeSubCat && d.sc !== activeSubCat) return false;
     if(p && d.p!==p) return false;
     if(f && !(activeCat && f==="Favoriet") && d.s!=="Favoriet" && d.s!=="Favori") return false;
+    if(!isNaN(diffFilter) && d.diff !== diffFilter) return false;
+    if(!isNaN(playersFilter) && d.pc !== playersFilter) return false;
     if(!matchesSearch(d, searchTerm)) return false;
     return true;
   });
@@ -542,12 +565,14 @@ function applyFilters(){
 
 function renderSubTabs(){
   const el = document.getElementById("subTabs");
-  if(activeCat !== "TT"){ el.style.display = "none"; el.innerHTML = ""; return; }
+  const opts = SUBCAT_OPTIONS[activeCat];
+  if(!activeCat || !opts){ el.style.display = "none"; el.innerHTML = ""; return; }
   el.style.display = "flex";
-  const col = CAT_COLORS.TT;
-  el.innerHTML = SUBCATS.map(function(sc){
+  const col = CAT_COLORS[activeCat];
+  const cat = activeCat;
+  el.innerHTML = opts.map(function(sc){
     const count = DATA.filter(function(d){
-      if(d.effC !== "TT" || d.sc !== sc) return false;
+      if(d.effC !== cat || d.sc !== sc) return false;
       if(statFilter === "USED") return d.u;
       if(statFilter === "TODAY") return d.t;
       return !d.u;
@@ -590,6 +615,8 @@ function renderPlatformChecks(){
 function bindStaticEvents(){
   document.getElementById("fPlatform").addEventListener("change", applyFilters);
   document.getElementById("fFav").addEventListener("change", applyFilters);
+  document.getElementById("fDifficulty").addEventListener("change", applyFilters);
+  document.getElementById("fPlayers").addEventListener("input", applyFilters);
   document.getElementById("searchInput").addEventListener("input", function(e){ searchTerm = e.target.value; applyFilters(); });
   document.getElementById("inspireBtn").addEventListener("click", function(){
     const base = filtered.length ? filtered : DATA;
@@ -625,13 +652,17 @@ function renderSpotlight(item){
   const col = item.effC ? CAT_COLORS[item.effC] : null;
   el.style.background = col ? col.bg : "var(--green-light)";
   const inToday = isInToday(item.id);
+  const spotMeta = [];
+  if(item.pc) spotMeta.push('👥 '+item.pc+' spelers');
+  if(item.diff) spotMeta.push('⭐'.repeat(item.diff)+'☆'.repeat(5-item.diff));
   el.innerHTML =
     '<div class="row"><span class="platform">'+item.p+'</span>'+
-    (item.effC ? '<span class="badge" style="color:'+col.fg+';">'+(CAT_SHORT[item.effC]||item.effC)+(item.sc?(' · '+item.sc):'')+'</span>' : '')+
+    (item.effC ? '<span class="badge" style="color:'+col.fg+';">'+(CAT_LABEL[item.effC]||item.effC)+(item.sc?(' · '+item.sc):'')+'</span>' : '')+
     ((item.s==="Favoriet"||item.s==="Favori") ? '<span class="star">★</span>' : '')+
     '<button class="icon-btn spot-today-btn" style="margin-left:auto;font-size:16px;" title="'+(inToday?"Uit training vandaag halen":"Toevoegen aan training vandaag")+'">'+(inToday?"❌":"📋")+'</button>'+
     '</div>'+
     (item.n ? '<div class="note">'+escapeHtml(item.n)+'</div>' : '')+
+    (spotMeta.length ? '<div class="note" style="opacity:0.8;font-size:12px;">'+spotMeta.join(' · ')+'</div>' : '')+
     '<a class="open" href="'+item.l+'" target="_blank" rel="noopener" style="color:'+(col?col.fg:'var(--green)')+';">Video openen →</a>';
   const spotBtn = document.querySelector('.spot-today-btn');
   if(spotBtn){
@@ -652,6 +683,10 @@ function renderList(){
       const catBadge = item.effC
         ? '<span class="cat" style="background:'+col.bg+';color:'+col.fg+';">'+(CAT_SHORT[item.effC]||item.effC)+(item.sc?(' · '+item.sc):'')+'</span>'
         : '<span class="cat" style="visibility:hidden;">-</span>';
+      const metaBits = [];
+      if(item.pc) metaBits.push('👥'+item.pc);
+      if(item.diff) metaBits.push('⭐'+item.diff);
+      const metaTag = metaBits.length ? '<span class="meta-tag">'+metaBits.join(' ')+'</span>' : '';
       const inToday = isInToday(item.id);
       const todayBtn = '<button class="icon-btn today-btn" title="'+(inToday?"Uit training vandaag halen":"Toevoegen aan training vandaag")+'">'+(inToday?"❌":"📋")+'</button>';
       const usedBtn = '<button class="icon-btn used-btn" title="'+(item.u?"Markeer als niet gebruikt":"Markeer als gebruikt")+'">'+(item.u?"↺":"✅")+'</button>';
@@ -661,6 +696,7 @@ function renderList(){
         '<a class="link-part" href="'+item.l+'" target="_blank" rel="noopener">'+
           catBadge+
           '<span class="note">'+escapeHtml(item.n||"")+'</span>'+
+          metaTag+
           usedDate+
           ((item.s==="Favoriet"||item.s==="Favori") ? '<span class="star">★</span>' : '')+
         '</a>'+
@@ -699,17 +735,41 @@ function renderList(){
 function openModal(html){ document.getElementById("modalContent").innerHTML = html; document.getElementById("modalOverlay").classList.add("show"); }
 function closeModal(){ document.getElementById("modalOverlay").classList.remove("show"); }
 function catOptionsHtml(selected){ return Object.keys(CAT_LABEL).map(function(k){ return '<option value="'+k+'"'+(k===selected?' selected':'')+'>'+CAT_LABEL[k]+'</option>'; }).join(""); }
-function subcatOptionsHtml(selected){
-  return '<option value="">— kies type —</option>' + SUBCATS.map(function(sc){
+function renderStarPicker(container, value){
+  container.setAttribute("data-value", String(value||0));
+  container.innerHTML = [1,2,3,4,5].map(function(i){
+    return '<span class="star-pick" data-val="'+i+'" style="cursor:pointer;font-size:22px;color:'+(i<=value?'var(--accent)':'#D8D8D2')+';">★</span>';
+  }).join("");
+  container.querySelectorAll(".star-pick").forEach(function(star){
+    star.addEventListener("click", function(){
+      const val = parseInt(star.getAttribute("data-val"),10);
+      const current = parseInt(container.getAttribute("data-value")||"0",10);
+      renderStarPicker(container, current === val ? 0 : val);
+    });
+  });
+}
+function subcatOptionsHtml(cat, selected){
+  const opts = SUBCAT_OPTIONS[cat] || [];
+  return '<option value="">— kies type —</option>' + opts.map(function(sc){
     return '<option value="'+sc+'"'+(sc===selected?' selected':'')+'>'+sc+'</option>';
   }).join("");
 }
-function bindCatSubcatToggle(){
+function bindCatSubcatToggle(initialSubcat){
   const catEl = document.getElementById("m_cat");
   const wrap = document.getElementById("m_subcat_wrap");
-  function sync(){ wrap.style.display = (catEl.value === "TT") ? "block" : "none"; }
-  sync();
-  catEl.addEventListener("change", sync);
+  const select = document.getElementById("m_subcat");
+  function sync(preserveSelected){
+    const opts = SUBCAT_OPTIONS[catEl.value];
+    if(opts){
+      wrap.style.display = "block";
+      select.innerHTML = subcatOptionsHtml(catEl.value, preserveSelected || "");
+    } else {
+      wrap.style.display = "none";
+      select.innerHTML = "";
+    }
+  }
+  sync(initialSubcat);
+  catEl.addEventListener("change", function(){ sync(""); });
 }
 function noteSuggestionsHtml(){
   const notes = Array.from(new Set(DATA.map(function(d){ return (d.n||"").trim(); }).filter(Boolean))).sort();
@@ -727,25 +787,34 @@ function openAddModal(){
     '<label>Categorie</label>'+
     '<select id="m_cat"><option value="">— geen —</option>'+catOptionsHtml("")+'</select>'+
     '<div id="m_subcat_wrap" style="display:none;"><label>Type</label>'+
-    '<select id="m_subcat">'+subcatOptionsHtml("")+'</select></div>'+
+    '<select id="m_subcat"></select></div>'+
+    '<label>Aantal spelers (optioneel)</label>'+
+    '<input type="number" id="m_players" min="1" max="30" placeholder="bijv. 8">'+
+    '<label>Moeilijkheidsgraad (optioneel)</label>'+
+    '<div id="m_difficulty_picker" data-value="0"></div>'+
     '<label>Notitie</label>'+
     '<input type="text" id="m_note" list="noteSuggestions" placeholder="Korte omschrijving...">'+
     '<datalist id="noteSuggestions">'+noteSuggestionsHtml()+'</datalist>'+
     '<div class="checkbox-row"><input type="checkbox" id="m_fav"><label style="margin:0;">Favoriet</label></div>'+
     '<div class="modal-actions"><button class="btn-secondary" id="m_cancel">Annuleren</button><button class="btn-primary" id="m_save">Opslaan</button></div>'
   );
-  bindCatSubcatToggle();
+  bindCatSubcatToggle("");
+  renderStarPicker(document.getElementById("m_difficulty_picker"), 0);
   document.getElementById("m_cancel").addEventListener("click", closeModal);
   document.getElementById("m_save").addEventListener("click", async function(){
     const url = document.getElementById("m_url").value.trim();
     if(!url){ alert("Vul een link in."); return; }
     const cat = document.getElementById("m_cat").value;
+    const playersVal = parseInt(document.getElementById("m_players").value, 10);
+    const diffVal = parseInt(document.getElementById("m_difficulty_picker").getAttribute("data-value"), 10);
     const payload = {
       link_date: todayStr(),
       platform: document.getElementById("m_platform").value,
       link: url,
       category: cat || null,
-      subcategory: (cat === "TT") ? (document.getElementById("m_subcat").value || null) : null,
+      subcategory: SUBCAT_OPTIONS[cat] ? (document.getElementById("m_subcat").value || null) : null,
+      player_count: isNaN(playersVal) ? null : playersVal,
+      difficulty: (diffVal && diffVal > 0) ? diffVal : null,
       status: document.getElementById("m_fav").checked ? "Favoriet" : null,
       note: document.getElementById("m_note").value.trim() || null,
       user_id: currentUser ? currentUser.id : null
@@ -809,20 +878,29 @@ function openEditModal(id){
     '<label>Categorie</label>'+
     '<select id="m_cat"><option value="">— geen —</option>'+catOptionsHtml(item.c)+'</select>'+
     '<div id="m_subcat_wrap" style="display:none;"><label>Type</label>'+
-    '<select id="m_subcat">'+subcatOptionsHtml(item.sc||"")+'</select></div>'+
+    '<select id="m_subcat"></select></div>'+
+    '<label>Aantal spelers (optioneel)</label>'+
+    '<input type="number" id="m_players" min="1" max="30" value="'+(item.pc||"")+'">'+
+    '<label>Moeilijkheidsgraad (optioneel)</label>'+
+    '<div id="m_difficulty_picker" data-value="0"></div>'+
     '<label>Notitie</label>'+
     '<input type="text" id="m_note" list="noteSuggestions" value="'+escapeHtml(item.n||"")+'">'+
     '<datalist id="noteSuggestions">'+noteSuggestionsHtml()+'</datalist>'+
     '<div class="checkbox-row"><input type="checkbox" id="m_fav" '+((item.s==="Favoriet"||item.s==="Favori")?'checked':'')+'><label style="margin:0;">Favoriet</label></div>'+
     '<div class="modal-actions"><button class="btn-secondary" id="m_cancel">Annuleren</button><button class="btn-primary" id="m_save">Opslaan</button></div>'
   );
-  bindCatSubcatToggle();
+  bindCatSubcatToggle(item.sc||"");
+  renderStarPicker(document.getElementById("m_difficulty_picker"), item.diff||0);
   document.getElementById("m_cancel").addEventListener("click", closeModal);
   document.getElementById("m_save").addEventListener("click", async function(){
     const cat = document.getElementById("m_cat").value;
+    const playersVal = parseInt(document.getElementById("m_players").value, 10);
+    const diffVal = parseInt(document.getElementById("m_difficulty_picker").getAttribute("data-value"), 10);
     const payload = {
       category: cat || null,
-      subcategory: (cat === "TT") ? (document.getElementById("m_subcat").value || null) : null,
+      subcategory: SUBCAT_OPTIONS[cat] ? (document.getElementById("m_subcat").value || null) : null,
+      player_count: isNaN(playersVal) ? null : playersVal,
+      difficulty: (diffVal && diffVal > 0) ? diffVal : null,
       note: document.getElementById("m_note").value.trim() || null,
       status: document.getElementById("m_fav").checked ? "Favoriet" : null
     };
