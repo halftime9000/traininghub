@@ -142,6 +142,7 @@
     <div class="stats" id="stats"></div>
     <div class="search-box"><input type="text" id="searchInput" placeholder="Zoek op trefwoord, categorie of platform..."></div>
     <div class="tabs" id="tabs"></div>
+    <div class="tabs" id="subTabs" style="display:none;"></div>
     <div class="platform-checks" id="platformChecks" style="display:none;"></div>
     <div class="reset-row" id="resetRow" style="display:none;"></div>
     <div class="controls">
@@ -173,17 +174,19 @@ const SUPABASE_URL = "https://sajuunjamflatbcfapdb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_yHYs7UlwfBkYeKvpqNwYAQ__SDnbrAT";
 // ============================================================
 
-const CAT_LABEL = {OPWARMING:"Opwarming", WV:"Wedstrijdvorm", TV:"Tussenvorm", EINDSPEL:"Eindspel", KEEPER:"Keeper", ANDERE:"Andere"};
-const CAT_SHORT = {OPWARMING:"Opw", WV:"WV", TV:"TV", EINDSPEL:"Eind", KEEPER:"GK", ANDERE:"And"};
+const CAT_LABEL = {OPWARMING:"Opwarming", TT:"Techniektraining", WV:"Wedstrijdvorm", TV:"Tussenvorm", EINDSPEL:"Eindspel", KEEPER:"Keeper", ANDERE:"Andere"};
+const CAT_SHORT = {OPWARMING:"Opw", TT:"TT", WV:"WV", TV:"TV", EINDSPEL:"Eind", KEEPER:"GK", ANDERE:"And"};
 const CAT_COLORS = {
-  OPWARMING: {bg:"#E8F5E9", fg:"#2E7D32"}, TV: {bg:"#FFF3E0", fg:"#E65100"}, WV: {bg:"#FFEBEE", fg:"#C62828"},
+  OPWARMING: {bg:"#E8F5E9", fg:"#2E7D32"}, TT: {bg:"#E0F7FA", fg:"#00838F"}, TV: {bg:"#FFF3E0", fg:"#E65100"}, WV: {bg:"#FFEBEE", fg:"#C62828"},
   EINDSPEL: {bg:"#F3E5F5", fg:"#6A1B9A"}, KEEPER: {bg:"#E3F2FD", fg:"#1565C0"}, ANDERE: {bg:"#EFEBE9", fg:"#6D4C41"}
 };
+const SUBCATS = ["1v1","2v1","3v1","Small groep"];
 const PLATFORMS = ["Instagram","TikTok","Facebook","YouTube","X/Twitter","PDF","Other"];
 
 let supabaseClient = null;
 let DATA = [];
 let activeCat = "";
+let activeSubCat = "";
 let statFilter = "ALL";
 let searchTerm = "";
 let checkedPlatforms = [];
@@ -369,7 +372,7 @@ async function loadData(){
     from += pageSize;
   }
   DATA = all.map(function(r){
-    return { id: r.id, d: r.link_date, p: r.platform, l: r.link, c: r.category || "", s: r.status || "", n: r.note || "", u: !!r.used, t: !!r.in_today, ua: r.used_at ? formatDateShort(r.used_at) : "" };
+    return { id: r.id, d: r.link_date, p: r.platform, l: r.link, c: r.category || "", sc: r.subcategory || "", s: r.status || "", n: r.note || "", u: !!r.used, t: !!r.in_today, ua: r.used_at ? formatDateShort(r.used_at) : "" };
   });
   DATA.forEach(function(d){ d.effC = d.c; });
 }
@@ -403,7 +406,7 @@ function refreshSelectors(){
 }
 
 function tabsHtml(){
-  const cats = ["OPWARMING","TV","WV","EINDSPEL","KEEPER","ANDERE"];
+  const cats = ["OPWARMING","TT","TV","WV","EINDSPEL","KEEPER","ANDERE"];
   return cats.map(function(c){
     const label = CAT_LABEL[c]||c;
     const count = DATA.filter(function(d){
@@ -421,7 +424,7 @@ function tabsHtml(){
   }).join("");
 }
 
-const CATEGORY_ORDER = ["OPWARMING","TV","WV","EINDSPEL","KEEPER","ANDERE"];
+const CATEGORY_ORDER = ["OPWARMING","TT","TV","WV","EINDSPEL","KEEPER","ANDERE"];
 
 function renderStats(){
   const total = DATA.length;
@@ -449,6 +452,7 @@ function renderStats(){
       const action = btn.getAttribute('data-stat');
       statFilter = (statFilter === action) ? "ALL" : action;
       activeCat = "";
+      activeSubCat = "";
       document.getElementById("fFav").value = (statFilter === "FAV") ? "Favoriet" : "";
       applyFilters();
       renderStats();
@@ -457,9 +461,10 @@ function renderStats(){
 }
 
 function bindTabs(){
-  document.querySelectorAll('.tab').forEach(function(btn){
+  document.querySelectorAll('#tabs .tab').forEach(function(btn){
     btn.addEventListener('click', function(){
       activeCat = (activeCat === btn.getAttribute('data-cat')) ? "" : btn.getAttribute('data-cat');
+      activeSubCat = "";
       if(statFilter !== "USED" && statFilter !== "TODAY"){
         statFilter = "ALL";
         document.getElementById("fFav").value = "";
@@ -472,7 +477,7 @@ function bindTabs(){
 
 function matchesSearch(item, term){
   if(!term) return true;
-  const hay = [item.n, item.p, item.effC ? (CAT_LABEL[item.effC]||item.effC) : "", item.l].join(" ").toLowerCase();
+  const hay = [item.n, item.p, item.effC ? (CAT_LABEL[item.effC]||item.effC) : "", item.sc||"", item.l].join(" ").toLowerCase();
   return hay.indexOf(term.toLowerCase()) !== -1;
 }
 
@@ -503,6 +508,7 @@ function applyFilters(){
       if(statFilter === "NONE" && checkedPlatforms.length && checkedPlatforms.indexOf(d.p)===-1) return false;
     }
     if(activeCat && d.effC!==activeCat) return false;
+    if(activeCat === "TT" && activeSubCat && d.sc !== activeSubCat) return false;
     if(p && d.p!==p) return false;
     if(f && !(activeCat && f==="Favoriet") && d.s!=="Favoriet" && d.s!=="Favori") return false;
     if(!matchesSearch(d, searchTerm)) return false;
@@ -530,7 +536,35 @@ function applyFilters(){
   visibleCount = 20;
   document.getElementById("tabs").innerHTML = tabsHtml();
   bindTabs();
+  renderSubTabs();
   renderList();
+}
+
+function renderSubTabs(){
+  const el = document.getElementById("subTabs");
+  if(activeCat !== "TT"){ el.style.display = "none"; el.innerHTML = ""; return; }
+  el.style.display = "flex";
+  const col = CAT_COLORS.TT;
+  el.innerHTML = SUBCATS.map(function(sc){
+    const count = DATA.filter(function(d){
+      if(d.effC !== "TT" || d.sc !== sc) return false;
+      if(statFilter === "USED") return d.u;
+      if(statFilter === "TODAY") return d.t;
+      return !d.u;
+    }).length;
+    const active = activeSubCat === sc;
+    const style = active
+      ? ' style="background:'+col.fg+';color:#fff;border-color:'+col.fg+';"'
+      : ' style="background:'+col.bg+';color:'+col.fg+';border-color:'+col.fg+';"';
+    return '<button class="tab" data-sub="'+sc+'"'+style+'>'+sc+' ('+count+')</button>';
+  }).join("");
+  el.querySelectorAll('.tab').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      const sc = btn.getAttribute('data-sub');
+      activeSubCat = (activeSubCat === sc) ? "" : sc;
+      applyFilters();
+    });
+  });
 }
 
 function renderPlatformChecks(){
@@ -593,7 +627,7 @@ function renderSpotlight(item){
   const inToday = isInToday(item.id);
   el.innerHTML =
     '<div class="row"><span class="platform">'+item.p+'</span>'+
-    (item.effC ? '<span class="badge" style="color:'+col.fg+';">'+(CAT_SHORT[item.effC]||item.effC)+'</span>' : '')+
+    (item.effC ? '<span class="badge" style="color:'+col.fg+';">'+(CAT_SHORT[item.effC]||item.effC)+(item.sc?(' · '+item.sc):'')+'</span>' : '')+
     ((item.s==="Favoriet"||item.s==="Favori") ? '<span class="star">★</span>' : '')+
     '<button class="icon-btn spot-today-btn" style="margin-left:auto;font-size:16px;" title="'+(inToday?"Uit training vandaag halen":"Toevoegen aan training vandaag")+'">'+(inToday?"❌":"📋")+'</button>'+
     '</div>'+
@@ -616,7 +650,7 @@ function renderList(){
     listEl.innerHTML = slice.map(function(item, idx){
       const col = item.effC ? CAT_COLORS[item.effC] : null;
       const catBadge = item.effC
-        ? '<span class="cat" style="background:'+col.bg+';color:'+col.fg+';">'+(CAT_SHORT[item.effC]||item.effC)+'</span>'
+        ? '<span class="cat" style="background:'+col.bg+';color:'+col.fg+';">'+(CAT_SHORT[item.effC]||item.effC)+(item.sc?(' · '+item.sc):'')+'</span>'
         : '<span class="cat" style="visibility:hidden;">-</span>';
       const inToday = isInToday(item.id);
       const todayBtn = '<button class="icon-btn today-btn" title="'+(inToday?"Uit training vandaag halen":"Toevoegen aan training vandaag")+'">'+(inToday?"❌":"📋")+'</button>';
@@ -665,6 +699,18 @@ function renderList(){
 function openModal(html){ document.getElementById("modalContent").innerHTML = html; document.getElementById("modalOverlay").classList.add("show"); }
 function closeModal(){ document.getElementById("modalOverlay").classList.remove("show"); }
 function catOptionsHtml(selected){ return Object.keys(CAT_LABEL).map(function(k){ return '<option value="'+k+'"'+(k===selected?' selected':'')+'>'+CAT_LABEL[k]+'</option>'; }).join(""); }
+function subcatOptionsHtml(selected){
+  return '<option value="">— kies type —</option>' + SUBCATS.map(function(sc){
+    return '<option value="'+sc+'"'+(sc===selected?' selected':'')+'>'+sc+'</option>';
+  }).join("");
+}
+function bindCatSubcatToggle(){
+  const catEl = document.getElementById("m_cat");
+  const wrap = document.getElementById("m_subcat_wrap");
+  function sync(){ wrap.style.display = (catEl.value === "TT") ? "block" : "none"; }
+  sync();
+  catEl.addEventListener("change", sync);
+}
 function noteSuggestionsHtml(){
   const notes = Array.from(new Set(DATA.map(function(d){ return (d.n||"").trim(); }).filter(Boolean))).sort();
   return notes.map(function(n){ return '<option value="'+escapeHtml(n)+'">'; }).join("");
@@ -680,21 +726,26 @@ function openAddModal(){
     '<select id="m_platform">'+platformOptionsHtml("Instagram")+'</select>'+
     '<label>Categorie</label>'+
     '<select id="m_cat"><option value="">— geen —</option>'+catOptionsHtml("")+'</select>'+
+    '<div id="m_subcat_wrap" style="display:none;"><label>Type</label>'+
+    '<select id="m_subcat">'+subcatOptionsHtml("")+'</select></div>'+
     '<label>Notitie</label>'+
     '<input type="text" id="m_note" list="noteSuggestions" placeholder="Korte omschrijving...">'+
     '<datalist id="noteSuggestions">'+noteSuggestionsHtml()+'</datalist>'+
     '<div class="checkbox-row"><input type="checkbox" id="m_fav"><label style="margin:0;">Favoriet</label></div>'+
     '<div class="modal-actions"><button class="btn-secondary" id="m_cancel">Annuleren</button><button class="btn-primary" id="m_save">Opslaan</button></div>'
   );
+  bindCatSubcatToggle();
   document.getElementById("m_cancel").addEventListener("click", closeModal);
   document.getElementById("m_save").addEventListener("click", async function(){
     const url = document.getElementById("m_url").value.trim();
     if(!url){ alert("Vul een link in."); return; }
+    const cat = document.getElementById("m_cat").value;
     const payload = {
       link_date: todayStr(),
       platform: document.getElementById("m_platform").value,
       link: url,
-      category: document.getElementById("m_cat").value || null,
+      category: cat || null,
+      subcategory: (cat === "TT") ? (document.getElementById("m_subcat").value || null) : null,
       status: document.getElementById("m_fav").checked ? "Favoriet" : null,
       note: document.getElementById("m_note").value.trim() || null,
       user_id: currentUser ? currentUser.id : null
@@ -757,16 +808,21 @@ function openEditModal(id){
     '<h3>Link bewerken</h3>'+
     '<label>Categorie</label>'+
     '<select id="m_cat"><option value="">— geen —</option>'+catOptionsHtml(item.c)+'</select>'+
+    '<div id="m_subcat_wrap" style="display:none;"><label>Type</label>'+
+    '<select id="m_subcat">'+subcatOptionsHtml(item.sc||"")+'</select></div>'+
     '<label>Notitie</label>'+
     '<input type="text" id="m_note" list="noteSuggestions" value="'+escapeHtml(item.n||"")+'">'+
     '<datalist id="noteSuggestions">'+noteSuggestionsHtml()+'</datalist>'+
     '<div class="checkbox-row"><input type="checkbox" id="m_fav" '+((item.s==="Favoriet"||item.s==="Favori")?'checked':'')+'><label style="margin:0;">Favoriet</label></div>'+
     '<div class="modal-actions"><button class="btn-secondary" id="m_cancel">Annuleren</button><button class="btn-primary" id="m_save">Opslaan</button></div>'
   );
+  bindCatSubcatToggle();
   document.getElementById("m_cancel").addEventListener("click", closeModal);
   document.getElementById("m_save").addEventListener("click", async function(){
+    const cat = document.getElementById("m_cat").value;
     const payload = {
-      category: document.getElementById("m_cat").value || null,
+      category: cat || null,
+      subcategory: (cat === "TT") ? (document.getElementById("m_subcat").value || null) : null,
       note: document.getElementById("m_note").value.trim() || null,
       status: document.getElementById("m_fav").checked ? "Favoriet" : null
     };
