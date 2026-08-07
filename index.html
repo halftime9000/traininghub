@@ -159,7 +159,13 @@
         <option value="4">★★★★☆</option>
         <option value="5">★★★★★</option>
       </select>
-      <input type="number" id="fPlayers" min="1" max="30" placeholder="Aantal spelers">
+      <select id="fPlayers">
+        <option value="">Alle aantallen</option>
+        <option value="1-5">1-5</option>
+        <option value="6-10">6-10</option>
+        <option value="10-14">10-14</option>
+        <option value="15+">15+</option>
+      </select>
     </div>
     <div class="btn-row">
       <button class="inspire-btn" id="inspireBtn">💡 Geef me inspiratie</button>
@@ -201,6 +207,7 @@ const SUBCAT_OPTIONS = {
   KEEPER: ["Reflexen","Positiespel","Afstoten","Andere"]
 };
 const PLATFORMS = ["Instagram","TikTok","Facebook","YouTube","X/Twitter","PDF","Other"];
+const PLAYER_RANGES = ["1-5","6-10","10-14","15+"];
 
 let supabaseClient = null;
 let DATA = [];
@@ -504,7 +511,7 @@ function applyFilters(){
   const p = document.getElementById("fPlatform").value;
   const f = document.getElementById("fFav").value;
   const diffFilter = parseInt(document.getElementById("fDifficulty").value, 10);
-  const playersFilter = parseInt(document.getElementById("fPlayers").value, 10);
+  const playersFilter = document.getElementById("fPlayers").value;
   const checksEl = document.getElementById("platformChecks");
   const inspireBtn = document.getElementById("inspireBtn");
   const hideInspire = (statFilter === "NONE" || statFilter === "USED" || statFilter === "TODAY");
@@ -529,11 +536,11 @@ function applyFilters(){
       if(statFilter === "NONE" && checkedPlatforms.length && checkedPlatforms.indexOf(d.p)===-1) return false;
     }
     if(activeCat && d.effC!==activeCat) return false;
-    if(activeCat && activeSubCat && d.sc !== activeSubCat) return false;
+    if(activeCat && activeSubCat && (d.sc||"").split(",").indexOf(activeSubCat) === -1) return false;
     if(p && d.p!==p) return false;
     if(f && !(activeCat && f==="Favoriet") && d.s!=="Favoriet" && d.s!=="Favori") return false;
     if(!isNaN(diffFilter) && d.diff !== diffFilter) return false;
-    if(!isNaN(playersFilter) && d.pc !== playersFilter) return false;
+    if(playersFilter && d.pc !== playersFilter) return false;
     if(!matchesSearch(d, searchTerm)) return false;
     return true;
   });
@@ -572,7 +579,7 @@ function renderSubTabs(){
   const cat = activeCat;
   el.innerHTML = opts.map(function(sc){
     const count = DATA.filter(function(d){
-      if(d.effC !== cat || d.sc !== sc) return false;
+      if(d.effC !== cat || (d.sc||"").split(",").indexOf(sc) === -1) return false;
       if(statFilter === "USED") return d.u;
       if(statFilter === "TODAY") return d.t;
       return !d.u;
@@ -616,7 +623,7 @@ function bindStaticEvents(){
   document.getElementById("fPlatform").addEventListener("change", applyFilters);
   document.getElementById("fFav").addEventListener("change", applyFilters);
   document.getElementById("fDifficulty").addEventListener("change", applyFilters);
-  document.getElementById("fPlayers").addEventListener("input", applyFilters);
+  document.getElementById("fPlayers").addEventListener("change", applyFilters);
   document.getElementById("searchInput").addEventListener("input", function(e){ searchTerm = e.target.value; applyFilters(); });
   document.getElementById("inspireBtn").addEventListener("click", function(){
     const base = filtered.length ? filtered : DATA;
@@ -654,10 +661,10 @@ function renderSpotlight(item){
   const inToday = isInToday(item.id);
   const spotMeta = [];
   if(item.pc) spotMeta.push('👥 '+item.pc+' spelers');
-  if(item.diff) spotMeta.push('⭐'.repeat(item.diff)+'☆'.repeat(5-item.diff));
+  if(item.diff) spotMeta.push('<span style="color:#DC2626;">'+'★'.repeat(item.diff)+'</span><span style="color:#D8D8D2;">'+'☆'.repeat(5-item.diff)+'</span>');
   el.innerHTML =
     '<div class="row"><span class="platform">'+item.p+'</span>'+
-    (item.effC ? '<span class="badge" style="color:'+col.fg+';">'+(CAT_LABEL[item.effC]||item.effC)+(item.sc?(' · '+item.sc):'')+'</span>' : '')+
+    (item.effC ? '<span class="badge" style="color:'+col.fg+';">'+(CAT_LABEL[item.effC]||item.effC)+(item.sc?(' · '+item.sc.split(',').join(', ')):'')+'</span>' : '')+
     ((item.s==="Favoriet"||item.s==="Favori") ? '<span class="star">★</span>' : '')+
     '<button class="icon-btn spot-today-btn" style="margin-left:auto;font-size:16px;" title="'+(inToday?"Uit training vandaag halen":"Toevoegen aan training vandaag")+'">'+(inToday?"❌":"📋")+'</button>'+
     '</div>'+
@@ -681,11 +688,11 @@ function renderList(){
     listEl.innerHTML = slice.map(function(item, idx){
       const col = item.effC ? CAT_COLORS[item.effC] : null;
       const catBadge = item.effC
-        ? '<span class="cat" style="background:'+col.bg+';color:'+col.fg+';">'+(CAT_SHORT[item.effC]||item.effC)+(item.sc?(' · '+item.sc):'')+'</span>'
+        ? '<span class="cat" style="background:'+col.bg+';color:'+col.fg+';">'+(CAT_SHORT[item.effC]||item.effC)+(item.sc?(' · '+item.sc.split(',').join(', ')):'')+'</span>'
         : '<span class="cat" style="visibility:hidden;">-</span>';
       const metaBits = [];
       if(item.pc) metaBits.push('👥'+item.pc);
-      if(item.diff) metaBits.push('⭐'+item.diff);
+      if(item.diff) metaBits.push('<span style="color:#DC2626;">★</span>×'+item.diff);
       const metaTag = metaBits.length ? '<span class="meta-tag">'+metaBits.join(' ')+'</span>' : '';
       const inToday = isInToday(item.id);
       const todayBtn = '<button class="icon-btn today-btn" title="'+(inToday?"Uit training vandaag halen":"Toevoegen aan training vandaag")+'">'+(inToday?"❌":"📋")+'</button>';
@@ -738,7 +745,7 @@ function catOptionsHtml(selected){ return Object.keys(CAT_LABEL).map(function(k)
 function renderStarPicker(container, value){
   container.setAttribute("data-value", String(value||0));
   container.innerHTML = [1,2,3,4,5].map(function(i){
-    return '<span class="star-pick" data-val="'+i+'" style="cursor:pointer;font-size:22px;color:'+(i<=value?'var(--accent)':'#D8D8D2')+';">★</span>';
+    return '<span class="star-pick" data-val="'+i+'" style="cursor:pointer;font-size:22px;color:'+(i<=value?'#DC2626':'#D8D8D2')+';">★</span>';
   }).join("");
   container.querySelectorAll(".star-pick").forEach(function(star){
     star.addEventListener("click", function(){
@@ -748,34 +755,45 @@ function renderStarPicker(container, value){
     });
   });
 }
-function subcatOptionsHtml(cat, selected){
+function subcatOptionsHtml(cat, selectedList){
   const opts = SUBCAT_OPTIONS[cat] || [];
-  return '<option value="">— kies type —</option>' + opts.map(function(sc){
-    return '<option value="'+sc+'"'+(sc===selected?' selected':'')+'>'+sc+'</option>';
+  const selected = selectedList || [];
+  return opts.map(function(sc){
+    const checked = selected.indexOf(sc) !== -1;
+    return '<label class="checkbox-row" style="margin-bottom:4px;"><input type="checkbox" class="m_subcat_opt" value="'+sc+'"'+(checked?' checked':'')+'><span style="margin:0;">'+sc+'</span></label>';
   }).join("");
 }
 function bindCatSubcatToggle(initialSubcat){
   const catEl = document.getElementById("m_cat");
   const wrap = document.getElementById("m_subcat_wrap");
-  const select = document.getElementById("m_subcat");
-  function sync(preserveSelected){
+  const container = document.getElementById("m_subcat");
+  function sync(preserveSelectedList){
     const opts = SUBCAT_OPTIONS[catEl.value];
     if(opts){
       wrap.style.display = "block";
-      select.innerHTML = subcatOptionsHtml(catEl.value, preserveSelected || "");
+      container.innerHTML = subcatOptionsHtml(catEl.value, preserveSelectedList || []);
     } else {
       wrap.style.display = "none";
-      select.innerHTML = "";
+      container.innerHTML = "";
     }
   }
-  sync(initialSubcat);
-  catEl.addEventListener("change", function(){ sync(""); });
+  const initialList = initialSubcat ? initialSubcat.split(",").map(function(s){return s.trim();}).filter(Boolean) : [];
+  sync(initialList);
+  catEl.addEventListener("change", function(){ sync([]); });
+}
+function getSelectedSubcats(){
+  return Array.from(document.querySelectorAll(".m_subcat_opt:checked")).map(function(cb){ return cb.value; });
 }
 function noteSuggestionsHtml(){
   const notes = Array.from(new Set(DATA.map(function(d){ return (d.n||"").trim(); }).filter(Boolean))).sort();
   return notes.map(function(n){ return '<option value="'+escapeHtml(n)+'">'; }).join("");
 }
 function platformOptionsHtml(selected){ return PLATFORMS.map(function(p){ return '<option value="'+p+'"'+(p===selected?' selected':'')+'>'+p+'</option>'; }).join(""); }
+function playerRangeOptionsHtml(selected){
+  return '<option value="">— geen —</option>' + PLAYER_RANGES.map(function(r){
+    return '<option value="'+r+'"'+(r===selected?' selected':'')+'>'+r+'</option>';
+  }).join("");
+}
 
 function openAddModal(){
   openModal(
@@ -787,9 +805,9 @@ function openAddModal(){
     '<label>Categorie</label>'+
     '<select id="m_cat"><option value="">— geen —</option>'+catOptionsHtml("")+'</select>'+
     '<div id="m_subcat_wrap" style="display:none;"><label>Type</label>'+
-    '<select id="m_subcat"></select></div>'+
+    '<div id="m_subcat"></div></div>'+
     '<label>Aantal spelers (optioneel)</label>'+
-    '<input type="number" id="m_players" min="1" max="30" placeholder="bijv. 8">'+
+    '<select id="m_players">'+playerRangeOptionsHtml("")+'</select>'+
     '<label>Moeilijkheidsgraad (optioneel)</label>'+
     '<div id="m_difficulty_picker" data-value="0"></div>'+
     '<label>Notitie</label>'+
@@ -805,15 +823,15 @@ function openAddModal(){
     const url = document.getElementById("m_url").value.trim();
     if(!url){ alert("Vul een link in."); return; }
     const cat = document.getElementById("m_cat").value;
-    const playersVal = parseInt(document.getElementById("m_players").value, 10);
+    const playersVal = document.getElementById("m_players").value;
     const diffVal = parseInt(document.getElementById("m_difficulty_picker").getAttribute("data-value"), 10);
     const payload = {
       link_date: todayStr(),
       platform: document.getElementById("m_platform").value,
       link: url,
       category: cat || null,
-      subcategory: SUBCAT_OPTIONS[cat] ? (document.getElementById("m_subcat").value || null) : null,
-      player_count: isNaN(playersVal) ? null : playersVal,
+      subcategory: SUBCAT_OPTIONS[cat] ? (getSelectedSubcats().join(",") || null) : null,
+      player_count: playersVal || null,
       difficulty: (diffVal && diffVal > 0) ? diffVal : null,
       status: document.getElementById("m_fav").checked ? "Favoriet" : null,
       note: document.getElementById("m_note").value.trim() || null,
@@ -878,9 +896,9 @@ function openEditModal(id){
     '<label>Categorie</label>'+
     '<select id="m_cat"><option value="">— geen —</option>'+catOptionsHtml(item.c)+'</select>'+
     '<div id="m_subcat_wrap" style="display:none;"><label>Type</label>'+
-    '<select id="m_subcat"></select></div>'+
+    '<div id="m_subcat"></div></div>'+
     '<label>Aantal spelers (optioneel)</label>'+
-    '<input type="number" id="m_players" min="1" max="30" value="'+(item.pc||"")+'">'+
+    '<select id="m_players">'+playerRangeOptionsHtml(item.pc||"")+'</select>'+
     '<label>Moeilijkheidsgraad (optioneel)</label>'+
     '<div id="m_difficulty_picker" data-value="0"></div>'+
     '<label>Notitie</label>'+
@@ -894,12 +912,12 @@ function openEditModal(id){
   document.getElementById("m_cancel").addEventListener("click", closeModal);
   document.getElementById("m_save").addEventListener("click", async function(){
     const cat = document.getElementById("m_cat").value;
-    const playersVal = parseInt(document.getElementById("m_players").value, 10);
+    const playersVal = document.getElementById("m_players").value;
     const diffVal = parseInt(document.getElementById("m_difficulty_picker").getAttribute("data-value"), 10);
     const payload = {
       category: cat || null,
-      subcategory: SUBCAT_OPTIONS[cat] ? (document.getElementById("m_subcat").value || null) : null,
-      player_count: isNaN(playersVal) ? null : playersVal,
+      subcategory: SUBCAT_OPTIONS[cat] ? (getSelectedSubcats().join(",") || null) : null,
+      player_count: playersVal || null,
       difficulty: (diffVal && diffVal > 0) ? diffVal : null,
       note: document.getElementById("m_note").value.trim() || null,
       status: document.getElementById("m_fav").checked ? "Favoriet" : null
