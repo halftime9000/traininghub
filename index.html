@@ -66,17 +66,19 @@
   .spotlight .note { font-size: 14px; }
   .spotlight a.open { font-size: 14px; font-weight: 600; text-decoration: none; margin-top: 4px; }
   .list { display: flex; flex-direction: column; }
-  .item { display: flex; align-items: center; gap: 8px; padding: 10px 4px; border-bottom: 1px solid var(--border); }
+  .item { display: flex; align-items: flex-start; gap: 8px; padding: 10px 4px; border-bottom: 1px solid var(--border); }
   .item.used { opacity: 0.45; }
-  .item .link-part { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; text-decoration: none; color: var(--text); }
+  .item .link-part { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; text-decoration: none; color: var(--text); }
+  .item .link-row-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .item .link-row-bottom { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .item .cat { font-size: 11px; padding: 2px 6px; border-radius: 6px; flex-shrink: 0; min-width: 32px; text-align: center; }
   .item .note { font-size: 13px; color: var(--text-secondary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .item .star { color: var(--accent); font-size: 13px; flex-shrink: 0; }
   .item .used-date { font-size: 11px; color: var(--text-secondary); flex-shrink: 0; white-space: nowrap; }
   .item .meta-tag { font-size: 11px; color: var(--text-secondary); flex-shrink: 0; white-space: nowrap; }
-  .item .idx { font-size: 12px; color: var(--text-secondary); flex-shrink: 0; width: 22px; text-align: right; }
-  .item .actions { display: flex; gap: 4px; flex-shrink: 0; }
-  .icon-btn { background: none; border: none; cursor: pointer; font-size: 14px; padding: 4px; opacity: 0.55; }
+  .item .idx { font-size: 12px; color: var(--text-secondary); flex-shrink: 0; width: 20px; text-align: right; padding-top: 2px; }
+  .item .actions { display: flex; gap: 1px; flex-shrink: 0; padding-top: 1px; }
+  .icon-btn { background: none; border: none; cursor: pointer; font-size: 14px; padding: 3px; opacity: 0.55; }
   .icon-btn:hover { opacity: 1; }
   .more-btn { width: 100%; padding: 10px; margin-top: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); font-size: 13px; cursor: pointer; }
   .empty { text-align: center; color: var(--text-secondary); font-size: 14px; padding: 20px 0; }
@@ -165,6 +167,7 @@
         <option value="6-10">6-10</option>
         <option value="10-14">10-14</option>
         <option value="15+">15+</option>
+        <option value="Random">Random</option>
       </select>
     </div>
     <div class="btn-row">
@@ -201,13 +204,13 @@ const CAT_COLORS = {
 const SUBCAT_OPTIONS = {
   OPWARMING: ["Dynamisch","Passing","Conditie","Wedstrijdopwarming","Balcontrole","Andere"],
   TT: ["1v1","2v1","3v1","Small groep"],
-  TV: ["Passing","Trappen","Omschakelen","Aanvallen","Verdedigen","Rondo","Afwerking","Andere"],
-  WV: ["Omschakelen","Vrijspel","Speciale thema","Andere"],
+  TV: ["Passing","Trappen","Omschakelen","Aanvallen","Verdedigen","Rondo","Afwerking","NvN","Andere"],
+  WV: ["Omschakelen","Vrijspel","Speciale thema","NvN","Andere"],
   EINDSPEL: ["Fun game","Positiespel","Kleine partij","Andere"],
   KEEPER: ["Reflexen","Positiespel","Afstoten","Andere"]
 };
 const PLATFORMS = ["Instagram","TikTok","Facebook","YouTube","X/Twitter","PDF","Other"];
-const PLAYER_RANGES = ["1-5","6-10","10-14","15+"];
+const PLAYER_RANGES = ["1-5","6-10","10-14","15+","Random"];
 
 let supabaseClient = null;
 let DATA = [];
@@ -692,7 +695,7 @@ function renderList(){
         : '<span class="cat" style="visibility:hidden;">-</span>';
       const metaBits = [];
       if(item.pc) metaBits.push('👥'+item.pc);
-      if(item.diff) metaBits.push('<span style="color:#DC2626;">★</span>×'+item.diff);
+      if(item.diff) metaBits.push('<span style="color:#DC2626;">★</span>'+item.diff);
       const metaTag = metaBits.length ? '<span class="meta-tag">'+metaBits.join(' ')+'</span>' : '';
       const inToday = isInToday(item.id);
       const todayBtn = '<button class="icon-btn today-btn" title="'+(inToday?"Uit training vandaag halen":"Toevoegen aan training vandaag")+'">'+(inToday?"❌":"📋")+'</button>';
@@ -701,11 +704,15 @@ function renderList(){
       return '<div class="item'+(item.u?' used':'')+'" data-id="'+item.id+'">'+
         '<span class="idx">'+(idx+1)+'.</span>'+
         '<a class="link-part" href="'+item.l+'" target="_blank" rel="noopener">'+
-          catBadge+
-          '<span class="note">'+escapeHtml(item.n||"")+'</span>'+
-          metaTag+
-          usedDate+
-          ((item.s==="Favoriet"||item.s==="Favori") ? '<span class="star">★</span>' : '')+
+          '<span class="link-row-top">'+
+            catBadge+
+            ((item.s==="Favoriet"||item.s==="Favori") ? '<span class="star">★</span>' : '')+
+          '</span>'+
+          '<span class="link-row-bottom">'+
+            '<span class="note">'+escapeHtml(item.n||"")+'</span>'+
+            metaTag+
+            usedDate+
+          '</span>'+
         '</a>'+
         '<span class="actions">'+
           todayBtn+
@@ -758,7 +765,16 @@ function renderStarPicker(container, value){
 function subcatOptionsHtml(cat, selectedList){
   const opts = SUBCAT_OPTIONS[cat] || [];
   const selected = selectedList || [];
+  const customValue = selected.find(function(v){ return opts.indexOf(v) === -1; }) || "";
+  const nvnChecked = selected.indexOf("NvN") !== -1 || !!customValue;
   return opts.map(function(sc){
+    if(sc === "NvN"){
+      return '<label class="checkbox-row" style="margin-bottom:4px;">'+
+        '<input type="checkbox" class="m_subcat_opt m_subcat_nvn" value="NvN"'+(nvnChecked?' checked':'')+'>'+
+        '<span style="margin:0;">NvN</span>'+
+        '<input type="text" id="m_subcat_nvn_input" placeholder="bijv. 4v4" value="'+escapeHtml(customValue)+'" style="width:90px;margin-left:6px;padding:4px 6px;font-size:12px;'+(nvnChecked?'':'display:none;')+'">'+
+      '</label>';
+    }
     const checked = selected.indexOf(sc) !== -1;
     return '<label class="checkbox-row" style="margin-bottom:4px;"><input type="checkbox" class="m_subcat_opt" value="'+sc+'"'+(checked?' checked':'')+'><span style="margin:0;">'+sc+'</span></label>';
   }).join("");
@@ -772,6 +788,14 @@ function bindCatSubcatToggle(initialSubcat){
     if(opts){
       wrap.style.display = "block";
       container.innerHTML = subcatOptionsHtml(catEl.value, preserveSelectedList || []);
+      const nvnCb = container.querySelector(".m_subcat_nvn");
+      const nvnInput = document.getElementById("m_subcat_nvn_input");
+      if(nvnCb && nvnInput){
+        nvnCb.addEventListener("change", function(){
+          nvnInput.style.display = nvnCb.checked ? "inline-block" : "none";
+          if(nvnCb.checked) nvnInput.focus();
+        });
+      }
     } else {
       wrap.style.display = "none";
       container.innerHTML = "";
@@ -782,7 +806,17 @@ function bindCatSubcatToggle(initialSubcat){
   catEl.addEventListener("change", function(){ sync([]); });
 }
 function getSelectedSubcats(){
-  return Array.from(document.querySelectorAll(".m_subcat_opt:checked")).map(function(cb){ return cb.value; });
+  const result = [];
+  document.querySelectorAll(".m_subcat_opt:checked").forEach(function(cb){
+    if(cb.classList.contains("m_subcat_nvn")){
+      const input = document.getElementById("m_subcat_nvn_input");
+      const val = input ? input.value.trim() : "";
+      result.push(val || "NvN");
+    } else {
+      result.push(cb.value);
+    }
+  });
+  return result;
 }
 function noteSuggestionsHtml(){
   const notes = Array.from(new Set(DATA.map(function(d){ return (d.n||"").trim(); }).filter(Boolean))).sort();
