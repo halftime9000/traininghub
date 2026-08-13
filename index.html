@@ -273,6 +273,7 @@ if(!isConfigured()){
 
 let currentUser = null;
 let authMode = "signin";
+let appStarted = false;
 
 async function bootstrap(){
   const { data } = await supabaseClient.auth.getSession();
@@ -288,6 +289,7 @@ async function bootstrap(){
       showApp();
     } else if(event === "SIGNED_OUT"){
       currentUser = null;
+      appStarted = false;
       showAuth();
     }
   });
@@ -303,13 +305,15 @@ function showAuth(){
 
 function showApp(){
   document.getElementById("authScreen").style.display = "none";
-  document.getElementById("loadState").style.display = "block";
   const badge = document.getElementById("accountBadge");
   badge.style.display = "flex";
+  if(appStarted) return;
+  appStarted = true;
   badge.innerHTML = '<span>'+escapeHtml(currentUser.email)+'</span><button id="logoutBtn" type="button">Uitloggen</button>';
   document.getElementById("logoutBtn").addEventListener("click", async function(){
     await supabaseClient.auth.signOut();
   });
+  document.getElementById("loadState").style.display = "block";
   init();
 }
 
@@ -507,6 +511,7 @@ function refreshSelectors(){
 }
 
 function tabsHtml(){
+  const favOnly = document.getElementById("fFav").value === "Favoriet";
   const cats = ["OPWARMING","TT","TV","WV","EINDSPEL","KEEPER","ANDERE"];
   return cats.map(function(c){
     const label = CAT_LABEL[c]||c;
@@ -514,7 +519,9 @@ function tabsHtml(){
       if(d.effC !== c) return false;
       if(statFilter === "USED") return d.u;
       if(statFilter === "TODAY") return d.t;
-      return !d.u;
+      if(d.u) return false;
+      if(favOnly && d.s!=="Favoriet" && d.s!=="Favori") return false;
+      return true;
     }).length;
     const active = activeCat === c ? "active" : "";
     const col = CAT_COLORS[c];
@@ -566,11 +573,8 @@ function bindTabs(){
     btn.addEventListener('click', function(){
       activeCat = (activeCat === btn.getAttribute('data-cat')) ? "" : btn.getAttribute('data-cat');
       activeSubCat = "";
-      if(statFilter === "USED" || statFilter === "TODAY"){
-        // context preserved as-is
-      } else if(statFilter === "FAV"){
-        statFilter = "ALL";
-        // keep fFav on "Favoriet" so the favorite context isn't lost
+      if(statFilter === "USED" || statFilter === "TODAY" || statFilter === "FAV"){
+        // context preserved as-is (Favoriet/Gebruikt/Training vandaag stay active)
       } else {
         statFilter = "ALL";
         document.getElementById("fFav").value = "";
@@ -619,7 +623,7 @@ function applyFilters(){
     if(activeCat && d.effC!==activeCat) return false;
     if(activeCat && activeSubCat && (d.sc||"").split(",").indexOf(activeSubCat) === -1) return false;
     if(p && d.p!==p) return false;
-    if(f && !(activeCat && f==="Favoriet") && d.s!=="Favoriet" && d.s!=="Favori") return false;
+    if(f && d.s!=="Favoriet" && d.s!=="Favori") return false;
     if(!isNaN(diffFilter) && d.diff !== diffFilter) return false;
     if(playersFilter && d.pc !== playersFilter) return false;
     if(!matchesSearch(d, searchTerm)) return false;
