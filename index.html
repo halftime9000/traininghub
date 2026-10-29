@@ -1069,6 +1069,7 @@ async function toggleUsed(id){
   if(!item) return;
   const nowUsed = !item.u;
   const payload = { used: nowUsed, used_at: nowUsed ? new Date().toISOString() : null };
+  if(nowUsed) payload.in_today = false;
   const { error } = await supabaseClient.from("training_links").update(payload).eq("id", id);
   if(error){ alert("Bijwerken mislukt: " + error.message); return; }
   await refreshKeep();
