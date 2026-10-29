@@ -221,19 +221,24 @@ let statFilter = "ALL";
 let searchTerm = "";
 let checkedPlatforms = [];
 function isInToday(id){ const item = DATA.find(function(d){ return String(d.id)===String(id); }); return item ? !!item.t : false; }
+async function refreshKeep(){
+  const y = window.scrollY, vc = visibleCount;
+  await loadData();
+  renderStats();
+  applyFilters(true);
+  visibleCount = vc;
+  renderList();
+  window.scrollTo(0, y);
+}
 async function addToToday(item){
   const { error } = await supabaseClient.from("training_links").update({ in_today: true }).eq("id", item.id);
   if(error){ alert("Bijwerken mislukt: " + error.message); return; }
-  await loadData();
-  renderStats();
-  applyFilters();
+  await refreshKeep();
 }
 async function removeFromToday(id){
   const { error } = await supabaseClient.from("training_links").update({ in_today: false }).eq("id", id);
   if(error){ alert("Bijwerken mislukt: " + error.message); return; }
-  await loadData();
-  renderStats();
-  applyFilters();
+  await refreshKeep();
 }
 async function resetToday(){
   if(!confirm("Training vandaag leegmaken?")) return;
@@ -591,7 +596,7 @@ function matchesSearch(item, term){
   return hay.indexOf(term.toLowerCase()) !== -1;
 }
 
-function applyFilters(){
+function applyFilters(keep){
   const p = document.getElementById("fPlatform").value;
   const f = document.getElementById("fFav").value;
   const diffFilter = parseInt(document.getElementById("fDifficulty").value, 10);
@@ -648,7 +653,7 @@ function applyFilters(){
     });
   }
   renderResetRow();
-  visibleCount = 20;
+  if(!keep) visibleCount = 20;
   document.getElementById("tabs").innerHTML = tabsHtml();
   bindTabs();
   renderSubTabs();
@@ -1056,9 +1061,7 @@ async function deleteLink(id){
   if(!confirm("Deze link verwijderen?")) return;
   const { error } = await supabaseClient.from("training_links").delete().eq("id", id);
   if(error){ alert("Verwijderen mislukt: " + error.message); return; }
-  await loadData();
-  renderStats();
-  applyFilters();
+  await refreshKeep();
 }
 
 async function toggleUsed(id){
@@ -1068,9 +1071,7 @@ async function toggleUsed(id){
   const payload = { used: nowUsed, used_at: nowUsed ? new Date().toISOString() : null };
   const { error } = await supabaseClient.from("training_links").update(payload).eq("id", id);
   if(error){ alert("Bijwerken mislukt: " + error.message); return; }
-  await loadData();
-  renderStats();
-  applyFilters();
+  await refreshKeep();
 }
 
 async function resetAllUsed(){
